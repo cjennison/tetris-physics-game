@@ -289,6 +289,21 @@ Phases are sequential — each builds on the previous. Within a phase, tasks can
 
 ---
 
+## Future: Special Materials Backlog
+
+These use the `SpecialMaterialSystem` + handler pattern (see `systems/handlers/GlassHandler.ts` as reference). Each is a new handler file + one `registerHandler()` call. Implement after the core gameplay loop (lasers, scoring) is solid.
+
+| Material | Behavior | Handler Approach |
+|----------|----------|-----------------|
+| **Glass** | Shatters on impact into fragments | `[x]` Implemented — radial fracture from collision point |
+| **Explosive** | On impact, pushes all nearby bodies outward in a blast radius | `applyForce()` to bodies within radius, proportional to distance. Remove explosive body, spawn shockwave particle effect |
+| **Nail** | Penetrates softer materials on impact, breaking through them | Compare density with hit body. If nail is harder, use polygon-splitting to punch a hole in the other piece. Nail embeds or passes through |
+| **Transmuter** | Changes the material of any piece it touches | On collision, swap `gameData.materialKey` and `gameData.material` of the OTHER body. Update its density/friction/color. Transmuter itself is consumed |
+| **Magnet** | Attracts nearby metal pieces (steel, aluminum) | Per-frame force application to nearby metal bodies. Pull toward magnet's position. Only affects conductive materials |
+| **Ice** | Low friction, slides on contact. Melts over time (shrinks) | Very low friction values. Per-frame area reduction. When too small, remove body |
+
+---
+
 ## Development Velocity Notes
 
 - **Phases 1-4**: Foundation — must be solid before moving forward
