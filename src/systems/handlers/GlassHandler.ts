@@ -99,29 +99,56 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
       config.minShardArea,
     );
 
+    /**
+     * LEARN: The #1 cause of physics "freakouts" is overlapping bodies.
+     * When fragments are created from the same polygon, they share edges
+     * and vertices. Matter.js detects these overlaps and applies huge
+     * separation forces — causing the jittery explosion you see.
+     *
+     * Three fixes work together:
+     * 1. NUDGE each fragment outward from the contact point before adding
+     *    it to the world. This creates tiny gaps between fragments.
+     * 2. frictionAir adds drag so fragments slow down quickly instead
+     *    of bouncing around forever.
+     * 3. slop (overlap tolerance) tells Matter.js to ignore tiny overlaps
+     *    instead of violently resolving them.
+     */
+    const NUDGE_DISTANCE = 2; // pixels to push fragments apart
+
     // Create physics bodies from fragments
     for (const fragVerts of fragments) {
       const center = polygonCentroid(fragVerts);
       const area = polygonArea(fragVerts);
       if (area < config.minShardArea) continue;
 
-      // Convert to local coordinates (relative to centroid)
+      // Nudge the center away from the contact point to prevent overlap
+      const dx = center.x - info.contactPoint.x;
+      const dy = center.y - info.contactPoint.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const nudgedCenter = {
+        x: center.x + (dx / dist) * NUDGE_DISTANCE,
+        y: center.y + (dy / dist) * NUDGE_DISTANCE,
+      };
+
+      // Convert to local coordinates (relative to nudged centroid)
       const localVerts = fragVerts.map(v => ({
-        x: v.x - center.x,
-        y: v.y - center.y,
+        x: v.x - nudgedCenter.x,
+        y: v.y - nudgedCenter.y,
       }));
 
       try {
         const fragBody = scene.matter.add.fromVertices(
-          center.x,
-          center.y,
+          nudgedCenter.x,
+          nudgedCenter.y,
           [localVerts],
           {
             label: 'piece-Glass-shard',
             restitution: 0.05,
-            friction: 0.3,
-            frictionStatic: 0.4,
+            friction: 0.5,
+            frictionStatic: 0.6,
+            frictionAir: 0.03,  // Air drag — fragments slow down quickly
             density: info.data.material.density * 0.8,
+            slop: 0.1,          // Tolerate small overlaps without jitter
             collisionFilter: {
               category: CollisionCategory.PIECE,
               mask: CollisionCategory.WALL | CollisionCategory.PIECE,
@@ -138,25 +165,24 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
         };
 
         /**
-         * LEARN: Scatter velocity is calculated from the vector between
-         * the collision point and the fragment's center. Fragments further
-         * from the impact get less force (inverse-ish relationship).
-         * This creates a natural "explosion" radiating from the impact.
+         * LEARN: Scatter velocity is gentle and capped. The original code
+         * divided by distance which could produce huge values for fragments
+         * near the impact point. Now we use a soft, capped formula:
+         * - Direction: outward from impact point
+         * - Magnitude: scatterForce, capped at a max
+         * - Inherit a fraction of the original body's velocity for realism
          */
-        const dx = center.x - info.contactPoint.x;
-        const dy = center.y - info.contactPoint.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const scatter = config.scatterForce / Math.max(dist * 0.02, 0.5);
+        const scatterMag = Math.min(config.scatterForce, 3);
 
         scene.matter.body.setVelocity(fragBody, {
-          x: (dx / dist) * scatter + info.body.velocity.x * 0.3,
-          y: (dy / dist) * scatter + info.body.velocity.y * 0.3,
+          x: (dx / dist) * scatterMag * 0.5 + info.body.velocity.x * 0.2,
+          y: (dy / dist) * scatterMag * 0.5 + info.body.velocity.y * 0.2,
         });
 
         // Small random spin for visual flair
         scene.matter.body.setAngularVelocity(
           fragBody,
-          (Math.random() - 0.5) * 0.1,
+          (Math.random() - 0.5) * 0.05,
         );
 
         allFragments.push(fragBody);
