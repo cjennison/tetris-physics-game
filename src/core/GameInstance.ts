@@ -275,13 +275,9 @@ export class GameInstance extends Phaser.Scene {
     // After 1 second, move to next piece
     const elapsed = Date.now() - this.dropTime;
     if (elapsed >= 1000) {
-      if (this.checkGameOver()) {
-        this.setState('game_over');
-      } else {
-        this.events.emit(EventBus.PIECE_SETTLED);
-        this.activePiece = null;
-        this.setState('laser_check');
-      }
+      this.events.emit(EventBus.PIECE_SETTLED);
+      this.activePiece = null;
+      this.setState('laser_check');
     }
   }
 
@@ -331,19 +327,6 @@ export class GameInstance extends Phaser.Scene {
    * Check if any piece body overlaps the crane rail Y position.
    * If so, the pile is too high and the game is over.
    */
-  private checkGameOver(): boolean {
-    const bodies = this.matter.world.getAllBodies();
-    for (const body of bodies) {
-      if (body.isStatic) continue;
-      if (body.label?.startsWith('piece-')) {
-        if (body.bounds.min.y < TUNING.crane.railY + 20) {
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
   /** Transition the game state machine */
   setState(newState: GameState): void {
     const prev = this.state;
