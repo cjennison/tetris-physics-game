@@ -166,7 +166,13 @@ export class LandscapeScene extends Phaser.Scene {
       cam.setZoom(newZoom);
     });
 
-    // Pan with middle mouse button drag or two-finger drag
+    /**
+     * LEARN: Pan by dragging anywhere on the canvas. Single finger/left
+     * click drag pans the camera. This conflicts with the touch control
+     * buttons, but those are DOM overlays above the canvas — they
+     * intercept touches before Phaser sees them. So dragging on the
+     * game area pans, while tapping buttons controls the crane.
+     */
     let isPanning = false;
     let panStartX = 0;
     let panStartY = 0;
@@ -174,18 +180,15 @@ export class LandscapeScene extends Phaser.Scene {
     let camStartY = 0;
 
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      // Middle button or two-finger touch
-      if (pointer.middleButtonDown() || (this.input.pointer1.isDown && this.input.pointer2.isDown)) {
-        isPanning = true;
-        panStartX = pointer.x;
-        panStartY = pointer.y;
-        camStartX = cam.scrollX;
-        camStartY = cam.scrollY;
-      }
+      isPanning = true;
+      panStartX = pointer.x;
+      panStartY = pointer.y;
+      camStartX = cam.scrollX;
+      camStartY = cam.scrollY;
     });
 
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      if (isPanning) {
+      if (isPanning && pointer.isDown) {
         const dx = (panStartX - pointer.x) / cam.zoom;
         const dy = (panStartY - pointer.y) / cam.zoom;
         cam.scrollX = camStartX + dx;
@@ -203,6 +206,7 @@ export class LandscapeScene extends Phaser.Scene {
 
     this.input.on('pointerdown', () => {
       if (this.input.pointer1.isDown && this.input.pointer2.isDown) {
+        isPanning = false; // Cancel pan when pinching
         pinchDist = Phaser.Math.Distance.Between(
           this.input.pointer1.x, this.input.pointer1.y,
           this.input.pointer2.x, this.input.pointer2.y,
