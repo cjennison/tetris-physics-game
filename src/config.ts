@@ -30,8 +30,8 @@ export const PILE_RIGHT = 400;
 export const COLUMN_HEIGHT = 300;
 
 /** Crane vehicle */
-export const VEHICLE_WIDTH = 50;
-export const VEHICLE_HEIGHT = 25;
+export const VEHICLE_WIDTH = 65;
+export const VEHICLE_HEIGHT = 32;
 export const VEHICLE_SPEED = 8;
 
 /** Phaser game config */

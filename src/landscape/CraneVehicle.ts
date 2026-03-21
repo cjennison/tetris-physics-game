@@ -26,7 +26,7 @@ import { Terrain } from './Terrain';
 import { TouchControls } from '../ui/TouchControls';
 
 const VEHICLE_CATEGORY = 0x0010;
-const WHEEL_RADIUS = 10;
+const WHEEL_RADIUS = 13;
 
 export class CraneVehicle {
   private scene: Phaser.Scene;
@@ -39,7 +39,7 @@ export class CraneVehicle {
 
   /** Boom arm */
   private boomAngle = -0.3;
-  private readonly BOOM_LENGTH = 80;
+  private readonly BOOM_LENGTH = 100;
   private readonly BOOM_MIN_ANGLE = -1.3;
   private readonly BOOM_MAX_ANGLE = 1.3;
   private readonly BOOM_SPEED = 0.025;
@@ -88,8 +88,10 @@ export class CraneVehicle {
       startX, chassisY, VEHICLE_WIDTH, VEHICLE_HEIGHT,
       {
         label: 'vehicle-chassis',
-        friction: 0.3,
-        density: 0.008,
+        friction: 0.8,
+        frictionStatic: 1.0,
+        frictionAir: 0.03,
+        density: 0.01,
         collisionFilter: { category: VEHICLE_CATEGORY, mask: collisionMask },
       },
     );
@@ -100,9 +102,9 @@ export class CraneVehicle {
       startX - VEHICLE_WIDTH / 3, wheelY, WHEEL_RADIUS,
       {
         label: 'vehicle-wheel',
-        friction: 0.95,
-        frictionStatic: 1.0,
-        density: 0.005,
+        friction: 1.5,
+        frictionStatic: 2.0,
+        density: 0.006,
         collisionFilter: { category: VEHICLE_CATEGORY, mask: collisionMask },
       },
     );
@@ -110,9 +112,9 @@ export class CraneVehicle {
       startX + VEHICLE_WIDTH / 3, wheelY, WHEEL_RADIUS,
       {
         label: 'vehicle-wheel',
-        friction: 0.95,
-        frictionStatic: 1.0,
-        density: 0.005,
+        friction: 1.5,
+        frictionStatic: 2.0,
+        density: 0.006,
         collisionFilter: { category: VEHICLE_CATEGORY, mask: collisionMask },
       },
     );
