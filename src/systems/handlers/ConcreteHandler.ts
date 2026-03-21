@@ -47,19 +47,23 @@ export const concreteCollisionHandler: MaterialCollisionHandler = (
 ): MatterJS.BodyType[] => {
   const config = getConcreteConfig();
 
-  // Relative speed check — concrete is tougher than glass
+  // Too small to crack further
+  const bodyArea = estimateBodyArea(info.body);
+  if (bodyArea < config.uncrackableArea) {
+    return [];
+  }
+
+  // Smaller fragments need harder hits — same scaling as glass
+  const fullPieceArea = 2500;
+  const sizeRatio = Math.max(1, fullPieceArea / bodyArea);
+  const adjustedThreshold = config.crackSpeedThreshold * sizeRatio;
+
   const velA = info.body.velocity;
   const velB = info.otherBody.velocity;
   const relVx = velA.x - velB.x;
   const relVy = velA.y - velB.y;
   const relativeSpeed = Math.sqrt(relVx * relVx + relVy * relVy);
-  if (relativeSpeed < config.crackSpeedThreshold) {
-    return [];
-  }
-
-  // Too small to crack further
-  const bodyArea = estimateBodyArea(info.body);
-  if (bodyArea < config.uncrackableArea) {
+  if (relativeSpeed < adjustedThreshold) {
     return [];
   }
 

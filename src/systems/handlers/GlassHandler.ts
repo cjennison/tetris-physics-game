@@ -57,18 +57,30 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
     return [];
   }
 
-  // Relative speed check
+  /**
+   * LEARN: Smaller fragments need a harder hit to break further.
+   * We scale the speed threshold by the ratio of "full piece area"
+   * to "current fragment area". A half-sized piece needs 2x the
+   * speed, a quarter-sized piece needs 4x, etc. This prevents
+   * tiny fragments from shattering on every gentle contact.
+   *
+   * fullPieceArea is a rough estimate of an unbroken piece (~2500px²).
+   */
+  const bodyArea = estimateBodyArea(info.body);
+  if (bodyArea < config.unbreakableArea) {
+    return [];
+  }
+
+  const fullPieceArea = 2500;
+  const sizeRatio = Math.max(1, fullPieceArea / bodyArea);
+  const adjustedThreshold = config.shatterSpeedThreshold * sizeRatio;
+
   const velA = info.body.velocity;
   const velB = info.otherBody.velocity;
   const relVx = velA.x - velB.x;
   const relVy = velA.y - velB.y;
   const relativeSpeed = Math.sqrt(relVx * relVx + relVy * relVy);
-  if (relativeSpeed < config.shatterSpeedThreshold) {
-    return [];
-  }
-
-  const bodyArea = estimateBodyArea(info.body);
-  if (bodyArea < config.unbreakableArea) {
+  if (relativeSpeed < adjustedThreshold) {
     return [];
   }
 
