@@ -152,16 +152,16 @@ export class CraneVehicle {
     this.state = 'carrying';
   }
 
+  /**
+   * Release the piece — detach from crane arm and let it fall.
+   * The piece body stays in the physics world and falls into the column.
+   */
   private releasePiece(): void {
     if (this.carryConstraint) {
       this.scene.matter.world.removeConstraint(this.carryConstraint);
       this.carryConstraint = null;
     }
-    // Remove the carried body — the column's receivePiece creates a fresh one
-    if (this.carriedBody) {
-      this.renderer.removeBody(this.carriedBody);
-      this.scene.matter.world.remove(this.carriedBody);
-    }
+    // Piece keeps its body and falls — column.receivePiece just tracks it
     this.carriedPiece = null;
     this.carriedBody = null;
     this.state = 'driving';

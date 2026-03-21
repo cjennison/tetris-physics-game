@@ -1,30 +1,28 @@
 /**
- * ProcessingColumn — A single trash processing shaft within the landscape
+ * ProcessingColumn — A trash processing shaft below ground level
  *
- * LEARN: This was previously GameInstance (a Phaser Scene). Now it's a plain
- * class that lives inside the LandscapeScene. It receives a reference to the
- * parent scene and an origin position (where the column sits in the landscape).
- * All coordinates are offset by originX/originY.
+ * LEARN: The column is a vertical shaft sunk into the ground. Pieces
+ * are dropped in from above by the crane vehicle — they fall under
+ * gravity and pile up inside. Lasers scan horizontal bands and slice
+ * pieces when coverage reaches 90%.
  *
- * The column no longer spawns its own pieces. Instead, pieces are delivered
- * to it via receivePiece() — called by the transfer mechanic or crane vehicle.
+ * No internal crane or hook — the vehicle drops pieces directly into
+ * the column opening. The column just manages walls, lasers, and
+ * special material handlers.
  *
- * STATE MACHINE:
- *   WAITING → SWINGING → DROPPING → LASER_CHECK → WAITING
- *   (waiting for piece delivery)
+ * STATE MACHINE (simplified):
+ *   WAITING → DROPPING → LASER_CHECK → WAITING
  */
 import Phaser from 'phaser';
 import { GameState } from '../types';
 import { EventBus } from './EventBus';
-import { CraneSystem } from '../systems/CraneSystem';
-import { InputSystem } from '../systems/InputSystem';
 import { PieceRenderer } from '../systems/PieceRenderer';
 import { SpecialMaterialSystem } from '../systems/SpecialMaterialSystem';
 import { glassCollisionHandler } from '../systems/handlers/GlassHandler';
 import { concreteCollisionHandler } from '../systems/handlers/ConcreteHandler';
 import { LaserSystem } from '../systems/LaserSystem';
 import { type SpawnedPiece } from '../pieces/PieceFactory';
-import { WALL_THICKNESS } from '../config';
+import { WALL_THICKNESS, GROUND_Y } from '../config';
 
 export interface ColumnConfig {
   id: string;
@@ -42,8 +40,6 @@ export class ProcessingColumn {
   private state: GameState = 'waiting';
 
   // Systems
-  private craneSystem!: CraneSystem;
-  private inputSystem!: InputSystem;
   private pieceRenderer: PieceRenderer;
   private specialMaterials!: SpecialMaterialSystem;
   private laserSystem!: LaserSystem;
@@ -51,14 +47,10 @@ export class ProcessingColumn {
   // Active piece tracking
   private activePiece: SpawnedPiece | null = null;
   private dropTime = 0;
-  /** When the piece was received — auto-drops after a delay */
-  private receiveTime = 0;
-  private readonly AUTO_DROP_DELAY = 1500; // 1.5s to swing, then auto-drop
 
   // Visuals
   private wallGraphics!: Phaser.GameObjects.Graphics;
   private stateText!: Phaser.GameObjects.Text;
-  private materialText!: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene, config: ColumnConfig, renderer: PieceRenderer) {
     this.scene = scene;
@@ -71,14 +63,6 @@ export class ProcessingColumn {
     this.createWalls();
     this.drawStaticElements();
 
-    // Systems — all receive the parent scene + origin offset
-    this.craneSystem = new CraneSystem(
-      this.scene, this.config.width, this.config.originX, this.config.originY,
-    );
-    this.inputSystem = new InputSystem(
-      this.scene, this.config.width, this.config.originX,
-    );
-
     this.specialMaterials = new SpecialMaterialSystem(this.scene, this.pieceRenderer);
     this.specialMaterials.registerHandler('glass', glassCollisionHandler);
     this.specialMaterials.registerHandler('concrete', concreteCollisionHandler);
@@ -89,17 +73,15 @@ export class ProcessingColumn {
       this.config.originX, this.config.originY,
     );
 
-    // Status text
     const cx = this.config.originX + this.config.width / 2;
     this.stateText = this.scene.add.text(cx, this.config.originY + 15, '', {
-      fontSize: '12px', color: '#666688', fontFamily: 'monospace',
+      fontSize: '11px', color: '#666688', fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(10);
 
-    this.materialText = this.scene.add.text(
-      cx, this.config.originY + this.config.height - 15, '', {
-        fontSize: '11px', color: '#aaaaaa', fontFamily: 'monospace',
-      },
-    ).setOrigin(0.5).setDepth(10);
+    // Column label above the opening
+    this.scene.add.text(cx, GROUND_Y - 15, this.config.id.toUpperCase(), {
+      fontSize: '10px', color: '#556677', fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(10);
 
     this.setState('waiting');
   }
@@ -110,10 +92,7 @@ export class ProcessingColumn {
 
     switch (this.state) {
       case 'waiting':
-        this.handleWaiting();
-        break;
-      case 'swinging':
-        this.handleSwinging();
+        // Idle — waiting for vehicle to drop a piece
         break;
       case 'dropping':
         this.handleDropping();
@@ -121,84 +100,54 @@ export class ProcessingColumn {
       case 'laser_check':
         this.setState('waiting');
         break;
-      case 'spawning':
-        // Legacy — treat as waiting
-        this.setState('waiting');
-        break;
-      case 'game_over':
+      default:
         break;
     }
 
-    this.stateText.setText(this.state === 'waiting' ? 'READY' : this.state.toUpperCase());
+    this.stateText.setText(this.state === 'waiting' ? '' : this.state.toUpperCase());
   }
 
   /**
-   * Receive a piece from the hopper/crane vehicle.
-   * Returns false if the column isn't ready (not in waiting state or hook blocked).
+   * Receive a piece dropped from the crane vehicle.
+   * The piece body is already in the physics world at the drop position.
+   * We just track it and wait for it to settle.
+   */
+  /**
+   * Receive a piece that's being dropped into the column.
+   * The piece body is already falling from the vehicle — we just
+   * track it for settling detection and laser interaction.
    */
   receivePiece(piece: SpawnedPiece): boolean {
     if (this.state !== 'waiting') return false;
-    if (!this.craneSystem.isHookAreaClear()) return false;
 
     this.activePiece = piece;
-    this.pieceRenderer.addBody(piece.body);
-    this.craneSystem.attachPiece(piece.body, piece.material);
-
-    this.materialText.setText(`${piece.material.label} ${piece.definition.name}`);
-    this.receiveTime = Date.now();
-    this.events.emit(EventBus.PIECE_SPAWNED, {
-      name: piece.definition.name,
-      material: piece.materialKey,
-    });
-    this.setState('swinging');
+    // Body is already in the renderer from when the vehicle grabbed it
+    this.dropTime = Date.now();
+    this.events.emit(EventBus.PIECE_DROPPED);
+    this.setState('dropping');
     return true;
   }
 
   /** Is this column ready to accept a piece? */
   isReady(): boolean {
-    return this.state === 'waiting' && this.craneSystem.isHookAreaClear();
+    return this.state === 'waiting';
+  }
+
+  /** Get the column opening center X */
+  getOpeningX(): number {
+    return this.config.originX + this.config.width / 2;
   }
 
   getState(): GameState { return this.state; }
 
-  private handleWaiting(): void {
-    const actions = this.inputSystem.getActions();
-    this.craneSystem.update(actions);
-  }
-
-  private handleSwinging(): void {
-    // Column crane still accepts keyboard input for manual control
-    const actions = this.inputSystem.getActions();
-    this.craneSystem.update(actions);
-
-    if (!this.craneSystem.hasAttachedPiece()) {
-      this.activePiece = null;
-      this.setState('laser_check');
-      return;
-    }
-
-    // Auto-drop after delay (or manual drop via space)
-    const elapsed = Date.now() - this.receiveTime;
-    if (actions.drop || elapsed >= this.AUTO_DROP_DELAY) {
-      const droppedBody = this.craneSystem.dropPiece();
-      if (droppedBody) {
-        this.dropTime = Date.now();
-        this.events.emit(EventBus.PIECE_DROPPED);
-        this.setState('dropping');
-      }
-    }
-  }
-
   private handleDropping(): void {
-    const actions = this.inputSystem.getActions();
-    this.craneSystem.update(actions);
-
     if (this.activePiece && this.isBodyDestroyed(this.activePiece.body)) {
       this.activePiece = null;
       this.setState('laser_check');
       return;
     }
 
+    // After 1 second, ready for next piece
     if (Date.now() - this.dropTime >= 1000) {
       this.events.emit(EventBus.PIECE_SETTLED);
       this.activePiece = null;
@@ -215,6 +164,7 @@ export class ProcessingColumn {
     this.events.emit(EventBus.STATE_CHANGED, { next: newState });
   }
 
+  /** Create column walls — below ground level */
   private createWalls(): void {
     const ox = this.config.originX;
     const oy = this.config.originY;
@@ -224,23 +174,26 @@ export class ProcessingColumn {
     // Floor
     this.scene.matter.add.rectangle(
       ox + w / 2, oy + h - WALL_THICKNESS / 2, w, WALL_THICKNESS,
-      { isStatic: true, label: 'column-floor', collisionFilter: { category: 0x0001, mask: 0x0002 | 0x0004 } },
+      { isStatic: true, label: 'column-floor', collisionFilter: { category: 0x0001, mask: 0x0002 } },
     );
 
-    // Side walls (extend above column for crane containment)
-    const wallHeight = h + 200;
-    const wallCenterY = oy + (h - 200) / 2;
+    // Side walls — extend from below ground to just above ground surface
+    // so pieces can fall in from above but can't escape sideways
+    const wallTop = oy - 10; // Slightly above column top (below ground)
+    const wallH = h + 10;
+    const wallCenterY = wallTop + wallH / 2;
 
     this.scene.matter.add.rectangle(
-      ox + WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallHeight,
-      { isStatic: true, label: 'column-wall-left', collisionFilter: { category: 0x0001, mask: 0x0002 | 0x0004 } },
+      ox + WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallH,
+      { isStatic: true, label: 'column-wall-left', collisionFilter: { category: 0x0001, mask: 0x0002 } },
     );
     this.scene.matter.add.rectangle(
-      ox + w - WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallHeight,
-      { isStatic: true, label: 'column-wall-right', collisionFilter: { category: 0x0001, mask: 0x0002 | 0x0004 } },
+      ox + w - WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallH,
+      { isStatic: true, label: 'column-wall-right', collisionFilter: { category: 0x0001, mask: 0x0002 } },
     );
   }
 
+  /** Draw the column shaft visual */
   private drawStaticElements(): void {
     this.wallGraphics = this.scene.add.graphics();
     const ox = this.config.originX;
@@ -248,19 +201,19 @@ export class ProcessingColumn {
     const w = this.config.width;
     const h = this.config.height;
 
-    // Column shaft background (slightly lighter than landscape)
-    this.wallGraphics.fillStyle(0x151528);
+    // Column shaft background
+    this.wallGraphics.fillStyle(0x101020);
     this.wallGraphics.fillRect(ox, oy, w, h);
 
     // Walls
-    this.wallGraphics.fillStyle(0x333355);
-    this.wallGraphics.fillRect(ox, oy + h - WALL_THICKNESS, w, WALL_THICKNESS);
-    this.wallGraphics.fillRect(ox, oy, WALL_THICKNESS, h);
-    this.wallGraphics.fillRect(ox + w - WALL_THICKNESS, oy, WALL_THICKNESS, h);
+    this.wallGraphics.fillStyle(0x2a2a44);
+    this.wallGraphics.fillRect(ox, oy + h - WALL_THICKNESS, w, WALL_THICKNESS); // floor
+    this.wallGraphics.fillRect(ox, oy, WALL_THICKNESS, h); // left
+    this.wallGraphics.fillRect(ox + w - WALL_THICKNESS, oy, WALL_THICKNESS, h); // right
 
-    // Column opening rim (at ground level)
+    // Column opening rim at ground level
     this.wallGraphics.fillStyle(0x444466);
-    this.wallGraphics.fillRect(ox - 5, oy - 5, w + 10, 10);
+    this.wallGraphics.fillRect(ox - 3, oy - 4, w + 6, 6);
 
     this.wallGraphics.setDepth(0);
   }
