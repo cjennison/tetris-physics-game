@@ -162,158 +162,213 @@ Phases are sequential — each builds on the previous. Within a phase, tasks can
 
 ---
 
-## Phase 7: Scoring & HUD `[ ]`
+## Phase 7: The Landscape & Hopper `[ ]`
 
-**Goal**: Points for clears, score display, level progression, next piece, game stats.
+**Goal**: Expand from a single column to a full landscape with a hopper that feeds incoming trash. This is the foundation for the "garbage processing plant" experience.
 
-**Key Concepts**: UI in Phaser, score systems, difficulty curves
+**Key Concepts**: Scene management, scrolling camera, entity spawning, queue systems
+
+**See**: `GAME_VISION.md` for the full design rationale.
 
 **Tasks**:
-- [ ] Create `ScoringSystem` — points per laser clear, combo multiplier
-- [ ] Create `HUD` — score, level, lines cleared, next piece
-- [ ] Implement combo: clearing multiple lasers within 3 seconds multiplies score
-- [ ] Level progression: every 10 lines, gravity increases slightly
-- [ ] Style HUD to match TRASH aesthetic
+- [ ] Create `LandscapeScene` — a wide scrolling scene containing the ground, hopper, and columns
+- [ ] Create `Hopper` entity — a container on the left side that accumulates incoming trash
+- [ ] Implement hopper fill rate — trash items appear in the hopper on a timer
+- [ ] Hopper capacity bar — visual indicator of how full the hopper is
+- [ ] Refactor current `GameInstance` board into a `ProcessingColumn` that lives within the landscape
+- [ ] Ground plane — flat surface between the hopper and columns
+- [ ] Camera system — scroll/pan across the landscape
 
 **Acceptance Criteria**:
-- [ ] Score increases on laser clears
-- [ ] Combo multiplier works for rapid clears
-- [ ] Level and gravity increase over time
-- [ ] HUD is readable and doesn't obstruct gameplay
+- [ ] Hopper visible on the left, filling up over time
+- [ ] At least one processing column visible to the right
+- [ ] Ground plane connects hopper to columns
+- [ ] Camera can pan to see the full landscape
 
 ---
 
-## Phase 8: Game Over & Polish `[ ]`
+## Phase 8: Crane Vehicle `[ ]`
 
-**Goal**: Game over detection, restart, visual/audio polish.
+**Goal**: Replace the static per-column crane with a driveable crane vehicle that moves across the landscape, picks up trash from the hopper, and delivers it to columns.
 
-**Key Concepts**: Game state management, particle systems, screen shake, juice
+**Key Concepts**: Vehicle physics, grab/release mechanics, state machines for vehicles
 
 **Tasks**:
-- [ ] Detect game over: any piece body overlaps crane rail Y
-- [ ] Game over screen with final score
-- [ ] Restart button
-- [ ] Screen shake on laser fire
-- [ ] Piece drop sound, laser sound, game over sound (Web Audio API)
-- [ ] Piece shadow/ghost showing where it will land
-- [ ] Background grid pattern
-- [ ] Smooth color transitions for piece fragments
+- [ ] Create `CraneVehicle` entity — drives left/right on the ground plane
+- [ ] Vehicle input: arrow keys / touch drag to drive
+- [ ] Magnet crane arm — extends upward to grab items from the hopper
+- [ ] Grab mechanic: position over hopper, activate magnet, item attaches to crane arm
+- [ ] Carry mechanic: drive with item attached, item swings on crane arm
+- [ ] Deliver mechanic: position over column, lower item into column
+- [ ] Column receives item → existing pendulum/drop mechanics take over
+- [ ] Vehicle cannot fall into columns (drives over them on bridge/rail)
+- [ ] Touch controls: tap hopper to grab, tap column to deliver, drag to drive
 
 **Acceptance Criteria**:
-- [ ] Game over triggers correctly when pieces reach the top
-- [ ] Can restart without page reload
-- [ ] At least 3 sound effects
-- [ ] Visual polish makes the game feel satisfying
+- [ ] Can drive crane vehicle left/right across landscape
+- [ ] Can grab a piece from the hopper
+- [ ] Piece swings on crane arm while driving
+- [ ] Can position over a column and deliver the piece
+- [ ] Piece enters column and behaves like current drop mechanics
+- [ ] Vehicle stays on ground, never falls into columns
 
 ---
 
-## Phase 9: Mobile & Touch Polish `[ ]`
+## Phase 9: Composite Shapes `[ ]`
 
-**Goal**: First-class mobile experience. Touch controls, responsive layout, PWA.
+**Goal**: Add complex real-world trash shapes beyond tetrominoes. Multi-material objects that create interesting gameplay when sliced.
 
-**Key Concepts**: Touch events, responsive design, PWA manifest, Capacitor basics
+**Key Concepts**: Complex polygon definitions, multi-material bodies, weighted spawning
 
 **Tasks**:
-- [ ] Touch controls: drag left/right to move crane, tap to drop
-- [ ] Responsive canvas sizing for different phone screens
-- [ ] PWA manifest + service worker (installable on home screen)
-- [ ] Prevent accidental zoom/scroll on mobile
-- [ ] Test on iOS Safari and Android Chrome
-- [ ] Add Capacitor config for future native build
+- [ ] Expand `PieceDefinitions` with composite shapes (chair, car, TV, etc.)
+- [ ] Multi-material support — different regions of a shape have different materials
+- [ ] When a laser slices a composite, each region behaves per its material (glass parts shatter, steel survives)
+- [ ] Composite shape categories with spawn weights per difficulty level
+- [ ] Visual distinction — composites look like recognizable objects, not abstract shapes
+- [ ] Add at least 10 composite shapes across household, vehicle, electronics categories
 
 **Acceptance Criteria**:
-- [ ] Playable on phone via touch with no keyboard
-- [ ] No accidental browser gestures during gameplay
-- [ ] Installable as PWA
-- [ ] Looks good on both phone and desktop
+- [ ] Composite shapes spawn from the hopper
+- [ ] Shapes are visually recognizable as real objects
+- [ ] Multi-material composites interact correctly with lasers
+- [ ] Different categories appear at different difficulty levels
 
 ---
 
-## Phase 10: Multi-Board Foundation `[ ]`
+## Phase 10: Overflow & Pressure `[ ]`
 
-**Goal**: Run 2+ game boards simultaneously. Zoom in/out between boards.
+**Goal**: Create the pressure loop — hopper overflow spills onto landscape, column overflow creates debris, the player must manage throughput to survive.
 
-**Key Concepts**: Multiple Phaser scenes, camera transitions, viewport management
+**Key Concepts**: Overflow mechanics, difficulty curves, pressure systems
 
 **Tasks**:
-- [ ] Extend `GameManager` to support N boards with viewport layout
-- [ ] Implement zoom-in animation: tapping a board smoothly zooms camera to fill screen
-- [ ] Implement zoom-out: leaving a board smoothly zooms back to overview
-- [ ] In overview mode, all boards run and render simultaneously
-- [ ] In focused mode, only the focused board receives input
-- [ ] Minimap or board selector UI
+- [ ] Hopper overflow: when full, trash spills onto the landscape as physics bodies
+- [ ] Spilled trash blocks crane vehicle paths (must drive around or clear)
+- [ ] Column overflow: when a column is full, new pieces bounce out and land on landscape
+- [ ] Throughput scoring — tons processed per minute, hopper efficiency bonus
+- [ ] Escalation curve — hopper fill rate increases over time
+- [ ] HUD: hopper capacity, throughput meter, score, column status indicators
 
 **Acceptance Criteria**:
-- [ ] 2+ boards visible simultaneously in overview
-- [ ] Smooth animated zoom transition (no snap)
-- [ ] Each board has independent physics and state
-- [ ] Can play one board while others continue running
+- [ ] Hopper visibly overflows when full
+- [ ] Spilled trash physically blocks the landscape
+- [ ] Column overflow creates landscape debris
+- [ ] Score tracks throughput
+- [ ] Difficulty clearly escalates over time
 
 ---
 
-## Phase 11: AI Players `[ ]`
+## Phase 11: Multi-Column & Camera `[ ]`
 
-**Goal**: Basic AI that can play TRASH on its own board. Multiple strategies.
+**Goal**: Multiple processing columns operating simultaneously, with smooth camera transitions between overview and focused column view.
 
-**Key Concepts**: Game AI, heuristic evaluation, action interfaces
+**Key Concepts**: Multiple physics worlds, camera transitions, viewport management
 
 **Tasks**:
-- [ ] Create `AIController` interface matching `GameActions`
-- [ ] Implement `BasicAI` — drops pieces to minimize height variance
-- [ ] Implement `AggressiveAI` — prioritizes laser clears
-- [ ] Implement `DefensiveAI` — builds flat, stable towers
+- [ ] Support 2-5 processing columns in the landscape
+- [ ] Each column has independent lasers and physics
+- [ ] Overview camera — see all columns + hopper + landscape at once
+- [ ] Zoom-in — tap a column to smoothly zoom camera into column view
+- [ ] Zoom-out — pinch or button to return to overview
+- [ ] Column status indicators visible in overview (fill level, laser activity)
+- [ ] Earn new columns through progression (score/throughput milestones)
+
+**Acceptance Criteria**:
+- [ ] 2+ columns visible and operational simultaneously
+- [ ] Smooth animated zoom transitions (no snapping)
+- [ ] Each column has independent physics and lasers
+- [ ] Can deliver trash to any column via crane vehicle
+
+---
+
+## Phase 12: AI Operators `[ ]`
+
+**Goal**: AI-controlled crane vehicles that operate autonomously. Player becomes a manager overseeing multiple AI operators.
+
+**Key Concepts**: Game AI, heuristic evaluation, strategy patterns, autonomous agents
+
+**Tasks**:
+- [ ] Create `AIOperator` interface — drives vehicle, grabs from hopper, delivers to columns
+- [ ] Implement `BasicAI` — grabs next item, delivers to least-full column
+- [ ] Implement `EfficientAI` — picks items that best fill current laser lines
+- [ ] Implement `SpeedAI` — prioritizes throughput over precision
+- [ ] Implement `EmergencyAI` — clears landscape debris and handles overflow
+- [ ] Assign/reassign AI operators to vehicles via UI
+- [ ] Visual indicators showing AI-controlled vehicles vs human
 - [ ] AI decision rate: evaluate every 500ms (not every frame)
-- [ ] Visual indicator showing which boards are AI-controlled
 
 **Acceptance Criteria**:
-- [ ] AI plays complete games without errors
-- [ ] Different strategies produce visibly different play styles
-- [ ] AI boards run alongside human board
-- [ ] Can watch AI play in zoom-in view
+- [ ] AI vehicles drive, grab, and deliver autonomously
+- [ ] Different strategies produce visibly different behaviors
+- [ ] Player can switch between manual control and AI for any vehicle
+- [ ] Multiple AI vehicles operate simultaneously without conflicts
 
 ---
 
-## Phase 12: Platform Distribution `[ ]`
+## Phase 13: Polish & Juice `[ ]`
 
-**Goal**: Package for Steam (Electron) and mobile app stores (Capacitor).
-
-**Key Concepts**: Electron packaging, Capacitor builds, app store requirements
+**Goal**: Make the game feel satisfying. Sound, particles, screen effects, UI polish.
 
 **Tasks**:
-- [ ] Electron wrapper with Steam API hooks
-- [ ] Capacitor iOS build
-- [ ] Capacitor Android build
-- [ ] Platform-specific input handling (gamepad for Steam)
-- [ ] Steam achievements integration
-- [ ] App store assets (icons, screenshots, descriptions)
+- [ ] Particle effects: laser fire, glass shatter, concrete crack, piece drop impact
+- [ ] Screen shake on laser fire and heavy drops
+- [ ] Sound effects: grab, drop, laser charge, laser fire, shatter, engine hum
+- [ ] Background music — industrial/ambient
+- [ ] UI polish: smooth transitions, button feedback, loading states
+- [ ] Piece preview — show what's coming next in the hopper
+- [ ] Tutorial/onboarding for new players
 
-**Acceptance Criteria**:
-- [ ] Runs as standalone desktop app via Electron
-- [ ] Builds for iOS and Android via Capacitor
-- [ ] Gamepad input works on Steam version
-- [ ] All platform builds pass basic smoke test
+---
+
+## Phase 14: Mobile & Touch Polish `[ ]`
+
+**Goal**: First-class mobile experience optimized for the landscape/driving gameplay.
+
+**Tasks**:
+- [ ] Touch controls: drag to drive, tap hopper to grab, tap column to deliver
+- [ ] Responsive layout for phone screens (landscape orientation)
+- [ ] PWA manifest + service worker
+- [ ] Prevent accidental browser gestures
+- [ ] Test on iOS Safari and Android Chrome
+- [ ] Capacitor config for native builds
+
+---
+
+## Phase 15: Platform Distribution `[ ]`
+
+**Goal**: Package for Steam and mobile app stores.
+
+**Tasks**:
+- [ ] Electron wrapper with Steam API
+- [ ] Capacitor iOS/Android builds
+- [ ] Gamepad support for Steam
+- [ ] App store assets and descriptions
 
 ---
 
 ## Future: Special Materials Backlog
 
-These use the `SpecialMaterialSystem` + handler pattern (see `systems/handlers/GlassHandler.ts` as reference). Each is a new handler file + one `registerHandler()` call. Implement after the core gameplay loop (lasers, scoring) is solid.
+These use the `SpecialMaterialSystem` + handler pattern (see `systems/handlers/GlassHandler.ts` as reference). Each is a new handler file + one `registerHandler()` call.
 
 | Material | Behavior | Handler Approach |
 |----------|----------|-----------------|
 | **Glass** | Shatters on impact into fragments | `[x]` Implemented — radial fracture from collision point |
-| **Explosive** | On impact, pushes all nearby bodies outward in a blast radius | `applyForce()` to bodies within radius, proportional to distance. Remove explosive body, spawn shockwave particle effect |
-| **Nail** | Penetrates softer materials on impact, breaking through them | Compare density with hit body. If nail is harder, use polygon-splitting to punch a hole in the other piece. Nail embeds or passes through |
-| **Transmuter** | Changes the material of any piece it touches | On collision, swap `gameData.materialKey` and `gameData.material` of the OTHER body. Update its density/friction/color. Transmuter itself is consumed |
-| **Magnet** | Attracts nearby metal pieces (steel, aluminum) | Per-frame force application to nearby metal bodies. Pull toward magnet's position. Only affects conductive materials |
-| **Ice** | Low friction, slides on contact. Melts over time (shrinks) | Very low friction values. Per-frame area reduction. When too small, remove body |
+| **Concrete** | Cracks in half on hard impact | `[x]` Implemented — single radial cut at contact point |
+| **Explosive** | On impact, pushes all nearby bodies outward in a blast radius | `applyForce()` to bodies within radius. Remove explosive body, spawn shockwave |
+| **Nail** | Penetrates softer materials on impact | Compare density, polygon-split the other piece. Nail embeds or passes through |
+| **Transmuter** | Changes the material of any piece it touches | Swap `gameData.material` of the OTHER body. Transmuter consumed |
+| **Magnet** | Attracts nearby metal pieces | Per-frame force to nearby metal bodies |
+| **Ice** | Low friction, melts over time (shrinks) | Per-frame area reduction, remove when too small |
+| **Radioactive** | Slowly damages adjacent pieces, breaking them down | Per-frame area reduction on touching bodies |
 
 ---
 
 ## Development Velocity Notes
 
-- **Phases 1-4**: Foundation — must be solid before moving forward
-- **Phases 5-6**: Core mechanic — the laser slicing is the hardest part, budget extra time
-- **Phases 7-8**: Polish — makes it feel like a real game
-- **Phase 9**: Mobile — critical for phone testing workflow
-- **Phases 10-12**: Grand vision — each is independent and can be reordered
+- **Phases 1-6**: Column mechanics — DONE ✓ (foundation, crane, pieces, materials, lasers, slicing)
+- **Phases 7-8**: The big pivot — landscape + driving transforms the game from Tetris-clone to unique experience
+- **Phase 9**: Composite shapes — adds visual identity and strategic depth
+- **Phase 10**: Pressure systems — this is where "fun" comes from
+- **Phases 11-12**: The grand vision — multi-column management + AI operators
+- **Phases 13-15**: Polish and distribution — only after gameplay is solid
