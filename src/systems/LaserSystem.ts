@@ -33,12 +33,14 @@ interface LaserLine {
   y: number;
   /** Coverage ratio 0-1 */
   coverage: number;
-  /** Whether coverage >= threshold */
-  ready: boolean;
   /** Timestamp of last fire (for cooldown) */
   lastFiredAt: number;
   /** Is this laser currently in cooldown? */
   onCooldown: boolean;
+  /** Timestamp when charging started (null = not charging) */
+  chargeStartedAt: number | null;
+  /** Charge progress 0-1 (fills left to right) */
+  chargeProgress: number;
 }
 
 export class LaserSystem {
@@ -80,9 +82,10 @@ export class LaserSystem {
       this.lasers.push({
         y: railY + spacing * i,
         coverage: 0,
-        ready: false,
         lastFiredAt: 0,
         onCooldown: false,
+        chargeStartedAt: null,
+        chargeProgress: 0,
       });
     }
   }
@@ -95,6 +98,7 @@ export class LaserSystem {
     const bandHeight = TUNING.laser.bandHeight;
     const threshold = TUNING.laser.coverageThreshold;
     const cooldownMs = TUNING.laser.cooldownMs;
+    const chargeMs = TUNING.laser.chargeMs ?? 3000;
     const now = Date.now();
 
     // Get all non-static piece bodies
@@ -109,14 +113,38 @@ export class LaserSystem {
       const bandTop = laser.y - bandHeight / 2;
       const bandBottom = laser.y + bandHeight / 2;
       laser.coverage = this.computeCoverage(bodies, bandTop, bandBottom);
-      laser.ready = laser.coverage >= threshold && !laser.onCooldown;
 
-      // Fire if ready
-      if (laser.ready) {
-        this.fireLaser(laser, bodies, bandTop, bandBottom);
-        laser.lastFiredAt = now;
-        laser.onCooldown = true;
-        laser.ready = false;
+      const hasEnoughCoverage = laser.coverage >= threshold && !laser.onCooldown;
+
+      /**
+       * LEARN: The laser has 3 phases:
+       * 1. IDLE — coverage below threshold, not charging
+       * 2. CHARGING — coverage hit threshold, charge bar filling left→right
+       * 3. FIRE — charge bar reached 100%, laser fires and enters cooldown
+       *
+       * If coverage drops below threshold DURING charging (pieces shift),
+       * the charge resets. This adds tension — you need the line to STAY
+       * covered for the full charge duration.
+       */
+      if (hasEnoughCoverage) {
+        // Start or continue charging
+        if (laser.chargeStartedAt === null) {
+          laser.chargeStartedAt = now;
+        }
+        laser.chargeProgress = Math.min(1, (now - laser.chargeStartedAt) / chargeMs);
+
+        // Fully charged — FIRE
+        if (laser.chargeProgress >= 1) {
+          this.fireLaser(laser, bodies, bandTop, bandBottom);
+          laser.lastFiredAt = now;
+          laser.onCooldown = true;
+          laser.chargeStartedAt = null;
+          laser.chargeProgress = 0;
+        }
+      } else {
+        // Coverage dropped — reset charge
+        laser.chargeStartedAt = null;
+        laser.chargeProgress = 0;
       }
     }
 
@@ -331,7 +359,7 @@ export class LaserSystem {
     this.eventBus.emit(EventBus.LINE_CLEARED, { y: _laser.y });
   }
 
-  /** Draw laser lines with coverage and state visualization */
+  /** Draw laser lines with coverage, charge bar, and state visualization */
   private draw(): void {
     this.graphics.clear();
     const bandHeight = TUNING.laser.bandHeight;
@@ -340,38 +368,55 @@ export class LaserSystem {
       const bandTop = laser.y - bandHeight / 2;
 
       if (laser.onCooldown) {
-        // Cooldown — dim red, thin line
-        this.graphics.lineStyle(1, 0xff4444, 0.15);
+        // Cooldown — dim, recharging
+        this.graphics.lineStyle(1, 0xff4444, 0.1);
         this.graphics.lineBetween(this.playLeft, laser.y, this.playRight, laser.y);
-      } else if (laser.coverage >= TUNING.laser.coverageThreshold) {
-        // About to fire — bright pulse (shouldn't stay here long)
-        this.graphics.fillStyle(0xff0000, 0.3);
+
+      } else if (laser.chargeProgress > 0) {
+        /**
+         * CHARGING — the exciting part. A bright bar sweeps left to right
+         * across the band. The band behind the bar glows intensely.
+         * When it reaches the right edge, the laser fires.
+         */
+        // Full band background glow (intensifies as charge progresses)
+        this.graphics.fillStyle(0xff2200, 0.1 + laser.chargeProgress * 0.15);
         this.graphics.fillRect(this.playLeft, bandTop, this.playWidth, bandHeight);
+
+        // Charge bar — sweeps left to right
+        const chargeWidth = this.playWidth * laser.chargeProgress;
+        this.graphics.fillStyle(0xff4400, 0.5 + laser.chargeProgress * 0.3);
+        this.graphics.fillRect(this.playLeft, bandTop, chargeWidth, bandHeight);
+
+        // Leading edge glow (bright white line at the charge front)
+        const frontX = this.playLeft + chargeWidth;
+        this.graphics.lineStyle(2, 0xffaa44, 0.8);
+        this.graphics.lineBetween(frontX, bandTop, frontX, bandTop + bandHeight);
+
+        // Center line
+        this.graphics.lineStyle(1, 0xff6644, 0.6);
+        this.graphics.lineBetween(this.playLeft, laser.y, this.playLeft + chargeWidth, laser.y);
+
       } else if (laser.coverage > 0.5) {
-        // Getting close — warm glow
-        const alpha = 0.05 + (laser.coverage - 0.5) * 0.4;
+        // Getting close to threshold — warm glow
+        const alpha = 0.05 + (laser.coverage - 0.5) * 0.3;
         this.graphics.fillStyle(0xff6600, alpha);
         this.graphics.fillRect(this.playLeft, bandTop, this.playWidth, bandHeight);
-        // Coverage bar
-        this.graphics.fillStyle(0xff4444, 0.3);
-        this.graphics.fillRect(
-          this.playLeft, bandTop,
-          this.playWidth * laser.coverage, bandHeight,
-        );
+        // Coverage indicator bar
+        this.graphics.fillStyle(0xff4444, 0.2);
+        this.graphics.fillRect(this.playLeft, bandTop, this.playWidth * laser.coverage, bandHeight);
         this.graphics.lineStyle(1, 0xff4444, 0.3);
         this.graphics.lineBetween(this.playLeft, laser.y, this.playRight, laser.y);
+
       } else if (laser.coverage > 0.1) {
-        // Some coverage — faint indicator
-        this.graphics.fillStyle(0xff4444, 0.08);
-        this.graphics.fillRect(
-          this.playLeft, bandTop,
-          this.playWidth * laser.coverage, bandHeight,
-        );
-        this.graphics.lineStyle(1, 0xff4444, 0.15);
+        // Some coverage — faint
+        this.graphics.fillStyle(0xff4444, 0.06);
+        this.graphics.fillRect(this.playLeft, bandTop, this.playWidth * laser.coverage, bandHeight);
+        this.graphics.lineStyle(1, 0xff4444, 0.12);
         this.graphics.lineBetween(this.playLeft, laser.y, this.playRight, laser.y);
+
       } else {
-        // No coverage — barely visible guide line
-        this.graphics.lineStyle(1, 0xff4444, 0.08);
+        // No coverage — barely visible guide
+        this.graphics.lineStyle(1, 0xff4444, 0.06);
         this.graphics.lineBetween(this.playLeft, laser.y, this.playRight, laser.y);
       }
     }

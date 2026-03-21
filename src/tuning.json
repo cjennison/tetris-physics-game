@@ -24,8 +24,10 @@
   "laser": {
     "bandHeight": 30,
     "coverageThreshold": 0.90,
+    "chargeMs": 3000,
     "cooldownMs": 2000,
-    "lineSpacing": 80
+    "lineSpacing": 80,
+    "_doc": "chargeMs = how long the laser charges (visual bar left→right) before firing. Coverage must stay above threshold for the full charge duration."
   },
 
   "settling": {
