@@ -135,15 +135,15 @@ export class CraneVehicle {
       collisionFilter: { category: VEHICLE_CATEGORY, mask: 0 },
     });
 
-    // Hook — real physics object, collides with terrain + pieces + walls
-    // Does NOT collide with bridge (0x0020) so it can reach into columns
+    // Hook — collides with terrain/ground only, NOT pieces.
+    // Passes through the pile so you can lower it onto a piece and grab.
     this.hook = scene.matter.add.circle(tipX, tipY + this.ropeLength, 6, {
       label: 'vehicle-hook', density: 0.003, frictionAir: 0.02,
       restitution: 0.1,
       friction: 0.5,
       collisionFilter: {
         category: VEHICLE_CATEGORY,
-        mask: 0x0001 | CollisionCategory.PIECE, // Terrain + pieces (walls use 0x0001)
+        mask: 0x0001, // Terrain only — passes through pieces
       },
     });
 
