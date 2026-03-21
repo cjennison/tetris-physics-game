@@ -29,6 +29,7 @@ import { PieceRenderer } from '../systems/PieceRenderer';
 import { SpecialMaterialSystem } from '../systems/SpecialMaterialSystem';
 import { glassCollisionHandler } from '../systems/handlers/GlassHandler';
 import { concreteCollisionHandler } from '../systems/handlers/ConcreteHandler';
+import { LaserSystem } from '../systems/LaserSystem';
 import { PieceFactory, type SpawnedPiece } from '../pieces/PieceFactory';
 import { DevConsole } from '../ui/DevConsole';
 import { TUNING } from '../tuning';
@@ -48,6 +49,7 @@ export class GameInstance extends Phaser.Scene {
   private pieceRenderer!: PieceRenderer;
   private pieceFactory!: PieceFactory;
   private specialMaterials!: SpecialMaterialSystem;
+  private laserSystem!: LaserSystem;
   // Kept alive for DOM side effects (toggle with ` key)
   private devConsole: DevConsole | undefined;
 
@@ -101,6 +103,16 @@ export class GameInstance extends Phaser.Scene {
     this.specialMaterials.registerHandler('glass', glassCollisionHandler);
     this.specialMaterials.registerHandler('concrete', concreteCollisionHandler);
 
+    // Laser system — horizontal lines that destroy pieces at 90%+ coverage
+    this.laserSystem = new LaserSystem(
+      this,
+      this.events,
+      this.pieceRenderer,
+      this.boardConfig.width,
+      this.boardConfig.height,
+      this.boardConfig.laserCount,
+    );
+
     // Status display
     this.stateText = this.add.text(this.boardConfig.width / 2, 15, '', {
       fontSize: '12px',
@@ -126,8 +138,9 @@ export class GameInstance extends Phaser.Scene {
     // Reset per-frame tracking for special materials
     this.specialMaterials.resetFrame();
 
-    // Always update rendering
+    // Always update rendering and lasers
     this.pieceRenderer.draw();
+    this.laserSystem.update();
 
     // State-specific logic
     switch (this.state) {
@@ -144,7 +157,7 @@ export class GameInstance extends Phaser.Scene {
         break;
 
       case 'laser_check':
-        // Lasers not implemented yet — skip to spawning
+        // Lasers run continuously in update(), this state just transitions
         this.setState('spawning');
         break;
 
@@ -393,15 +406,7 @@ export class GameInstance extends Phaser.Scene {
     this.wallGraphics.fillRect(0, 0, WALL_THICKNESS, this.boardConfig.height);
     this.wallGraphics.fillRect(w - WALL_THICKNESS, 0, WALL_THICKNESS, this.boardConfig.height);
 
-    // Laser line guides (faint)
-    const railY = TUNING.crane.railY;
-    const playHeight = this.boardConfig.height - WALL_THICKNESS - railY;
-    const spacing = playHeight / (this.boardConfig.laserCount + 1);
-    this.wallGraphics.lineStyle(1, 0xff4444, 0.15);
-    for (let i = 1; i <= this.boardConfig.laserCount; i++) {
-      const y = railY + spacing * i;
-      this.wallGraphics.lineBetween(WALL_THICKNESS, y, w - WALL_THICKNESS, y);
-    }
+    // Laser lines are now drawn by LaserSystem (dynamic based on coverage)
 
     // Depth behind pieces
     this.wallGraphics.setDepth(0);
