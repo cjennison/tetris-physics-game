@@ -161,6 +161,11 @@ export class CraneVehicle {
     this.setupInput();
   }
 
+  /** Get the vehicle chassis position for camera following */
+  getPosition(): { x: number; y: number } {
+    return { x: this.chassis.position.x, y: this.chassis.position.y };
+  }
+
   addColumnZone(left: number, right: number, deliver: (piece: SpawnedPiece) => boolean): void {
     this.columnZones.push({ left, right, deliver });
   }

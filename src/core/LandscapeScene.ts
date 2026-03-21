@@ -102,6 +102,50 @@ export class LandscapeScene extends Phaser.Scene {
     for (const col of this.columns) {
       col.update(time, delta);
     }
+    this.followVehicle();
+  }
+
+  /**
+   * Camera follows the vehicle, keeping it within the middle 30% of the
+   * viewport. Camera never shows outside the landscape bounds.
+   */
+  private followVehicle(): void {
+    const cam = this.cameras.main;
+    const pos = this.vehicle.getPosition();
+
+    // The "dead zone" — middle 30% of the viewport (in world coords)
+    const viewW = cam.width / cam.zoom;
+    const viewH = cam.height / cam.zoom;
+    const deadW = viewW * 0.3;
+    const deadH = viewH * 0.3;
+
+    // Current camera center
+    const camCX = cam.scrollX + viewW / 2;
+    const camCY = cam.scrollY + viewH / 2;
+
+    // How far the vehicle is from the camera center
+    const dx = pos.x - camCX;
+    const dy = pos.y - camCY;
+
+    // If the vehicle is outside the dead zone, nudge the camera
+    let targetX = cam.scrollX;
+    let targetY = cam.scrollY;
+
+    if (Math.abs(dx) > deadW / 2) {
+      targetX += (dx - Math.sign(dx) * deadW / 2) * 0.08;
+    }
+    if (Math.abs(dy) > deadH / 2) {
+      targetY += (dy - Math.sign(dy) * deadH / 2) * 0.08;
+    }
+
+    // Clamp so camera never shows outside landscape bounds
+    const minX = 0;
+    const minY = 0;
+    const maxX = LANDSCAPE_WIDTH - viewW;
+    const maxY = LANDSCAPE_HEIGHT - viewH;
+
+    cam.scrollX = Phaser.Math.Clamp(targetX, minX, Math.max(minX, maxX));
+    cam.scrollY = Phaser.Math.Clamp(targetY, minY, Math.max(minY, maxY));
   }
 
   private createWalls(): void {
