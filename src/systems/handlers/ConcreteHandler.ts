@@ -24,8 +24,6 @@ import {
   polygonCentroid,
   estimateBodyArea,
   radialFracture,
-  convexHull,
-  getBodyVertices,
 } from '../../utils/PolygonUtils';
 
 function getConcreteConfig() {
@@ -67,31 +65,31 @@ export const concreteCollisionHandler: MaterialCollisionHandler = (
     return [];
   }
 
-  // Get the full shape as a single polygon
-  const allVerts = getBodyVertices(info.body);
-  const hullVerts = convexHull(allVerts);
-  if (hullVerts.length < 3) return [];
+  // Fracture each sub-part individually to preserve concave shape
+  const parts = info.body.parts.length > 1
+    ? info.body.parts.slice(1)
+    : [info.body];
 
-  /**
-   * LEARN: Concrete gets exactly 1 cut — this splits it into 2 halves.
-   * The cut goes through the impact point, so if a piece lands on its
-   * corner, the crack runs through that corner. If it lands flat,
-   * the crack runs through the center of the bottom edge.
-   */
-  const fragments = radialFracture(
-    hullVerts,
-    info.contactPoint,
-    1, // Single cut = 2 halves
-    config.minFragmentArea,
-  );
+  const allFragVerts: Array<Array<{ x: number; y: number }>> = [];
+  for (const part of parts) {
+    if (!part.vertices || part.vertices.length < 3) continue;
+    const partVerts = part.vertices.map((v: { x: number; y: number }) => ({ x: v.x, y: v.y }));
+    const partFragments = radialFracture(
+      partVerts,
+      info.contactPoint,
+      1, // Single cut = 2 halves per sub-part
+      config.minFragmentArea,
+    );
+    allFragVerts.push(...partFragments);
+  }
 
   // Need at least 2 fragments for a crack
-  if (fragments.length < 2) return [];
+  if (allFragVerts.length < 2) return [];
 
   const NUDGE_DISTANCE = 1.5;
   const allFragments: MatterJS.BodyType[] = [];
 
-  for (const fragVerts of fragments) {
+  for (const fragVerts of allFragVerts) {
     const center = polygonCentroid(fragVerts);
     const area = polygonArea(fragVerts);
     if (area < config.minFragmentArea) continue;

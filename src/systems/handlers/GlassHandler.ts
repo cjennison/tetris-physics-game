@@ -23,8 +23,6 @@ import {
   polygonCentroid,
   estimateBodyArea,
   radialFracture,
-  convexHull,
-  getBodyVertices,
 } from '../../utils/PolygonUtils';
 
 function getGlassConfig() {
@@ -84,22 +82,36 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
     return [];
   }
 
-  // Get full shape as single polygon via convex hull
-  const allVerts = getBodyVertices(info.body);
-  const hullVerts = convexHull(allVerts);
-  if (hullVerts.length < 3) return [];
+  /**
+   * LEARN: For compound bodies (T, S, Z, L, J), we fracture each convex
+   * sub-part INDIVIDUALLY rather than hulling them into one polygon.
+   * The convex hull approach loses the concave shape — an L-Block's hull
+   * is a triangle, which produces triangular blobs instead of L-shaped
+   * fragments. By cutting each sub-part with the same fracture lines,
+   * the fragments respect the original concave geometry.
+   */
+  const parts = info.body.parts.length > 1
+    ? info.body.parts.slice(1)
+    : [info.body];
 
-  const fragments = radialFracture(
-    hullVerts,
-    info.contactPoint,
-    config.fractureCuts,
-    config.minShardArea,
-  );
+  // Collect all fragments from all sub-parts
+  const allFragVerts: Array<Array<{ x: number; y: number }>> = [];
+  for (const part of parts) {
+    if (!part.vertices || part.vertices.length < 3) continue;
+    const partVerts = part.vertices.map((v: { x: number; y: number }) => ({ x: v.x, y: v.y }));
+    const partFragments = radialFracture(
+      partVerts,
+      info.contactPoint,
+      config.fractureCuts,
+      config.minShardArea,
+    );
+    allFragVerts.push(...partFragments);
+  }
 
   const NUDGE_DISTANCE = 2;
   const allFragments: MatterJS.BodyType[] = [];
 
-  for (const fragVerts of fragments) {
+  for (const fragVerts of allFragVerts) {
     const center = polygonCentroid(fragVerts);
     const area = polygonArea(fragVerts);
     if (area < config.minShardArea) continue;
