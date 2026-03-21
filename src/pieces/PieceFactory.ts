@@ -158,7 +158,7 @@ export class PieceFactory {
         density: material.density,
         collisionFilter: {
           category: CollisionCategory.PIECE,
-          mask: CollisionCategory.WALL | CollisionCategory.PIECE,
+          mask: CollisionCategory.WALL | CollisionCategory.PIECE | 0x0008,
         },
       },
       true,

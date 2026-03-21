@@ -174,22 +174,27 @@ export class ProcessingColumn {
     // Floor
     this.scene.matter.add.rectangle(
       ox + w / 2, oy + h - WALL_THICKNESS / 2, w, WALL_THICKNESS,
-      { isStatic: true, label: 'column-floor', collisionFilter: { category: 0x0001, mask: 0x0002 } },
+      { isStatic: true, label: 'column-floor', collisionFilter: { category: 0x0008, mask: 0x0002 } },
     );
 
-    // Side walls — extend from below ground to just above ground surface
-    // so pieces can fall in from above but can't escape sideways
-    const wallTop = oy - 10; // Slightly above column top (below ground)
+    /**
+     * LEARN: Column walls use a separate collision category (0x0008) that
+     * only pieces collide with. The vehicle (0x0010) ignores them completely
+     * and drives right over the column opening on the bridge. The hook
+     * (also 0x0010) also passes through so it can reach into the column.
+     */
+    const COLUMN_WALL_CATEGORY = 0x0008;
+    const wallTop = oy - 10;
     const wallH = h + 10;
     const wallCenterY = wallTop + wallH / 2;
 
     this.scene.matter.add.rectangle(
       ox + WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallH,
-      { isStatic: true, label: 'column-wall-left', collisionFilter: { category: 0x0001, mask: 0x0002 } },
+      { isStatic: true, label: 'column-wall-left', collisionFilter: { category: COLUMN_WALL_CATEGORY, mask: 0x0002 } },
     );
     this.scene.matter.add.rectangle(
       ox + w - WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallH,
-      { isStatic: true, label: 'column-wall-right', collisionFilter: { category: 0x0001, mask: 0x0002 } },
+      { isStatic: true, label: 'column-wall-right', collisionFilter: { category: COLUMN_WALL_CATEGORY, mask: 0x0002 } },
     );
   }
 

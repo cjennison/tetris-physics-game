@@ -354,7 +354,7 @@ export class LaserSystem {
               density: data.material.density,
               collisionFilter: {
                 category: CollisionCategory.PIECE,
-                mask: CollisionCategory.WALL | CollisionCategory.PIECE,
+                mask: CollisionCategory.WALL | CollisionCategory.PIECE | 0x0008,
               },
             },
             true,
