@@ -1,20 +1,21 @@
 /**
- * CraneSystem — Trolley movement, rope constraint, pendulum physics
+ * CraneSystem — Trolley, rope, hook, and piece attachment
  *
- * LEARN: This is the core "feel" system of TRASH. The crane is a horizontal
- * trolley at the top of the board. A physics constraint (rope) connects it
- * to the active piece. When the trolley moves, the piece swings like a
- * pendulum because of inertia.
+ * LEARN: The crane has 3 permanent parts and 1 temporary connection:
  *
- * Key physics concept: A Matter.js Constraint is like a spring connecting
- * two bodies. By making it fairly stiff (0.9) with very low damping (0.005),
- * the piece swings freely but doesn't stretch away from the trolley.
- * When the player drops, we simply REMOVE the constraint — the piece keeps
- * whatever velocity it had from swinging, plus gravity pulls it down.
+ *   Trolley (static) --[rope]--> Hook (dynamic) --[clip]--> Piece
+ *   \_________permanent__________/  \____temporary____/
  *
- * The trolley itself is a "static" body — it doesn't respond to forces.
- * We move it directly by setting its position. This is called a "kinematic"
- * body in game dev terms (moves by code, not by physics).
+ * The TROLLEY slides along the rail (kinematic — moved by code).
+ * The ROPE is a constraint connecting the trolley to the HOOK.
+ * The HOOK is a tiny dynamic body that swings freely on the rope.
+ * The CLIP is a short, stiff constraint connecting the hook to the piece.
+ *
+ * When a piece is dropped or destroyed (glass shatter), only the CLIP
+ * is removed. The hook stays on the rope, swinging naturally. This means:
+ * - The rope visually keeps swinging after glass shatters on a wall
+ * - The hook's momentum carries into the next piece when one is attached
+ * - The rope is its own persistent entity, not tied to any specific piece
  */
 import Phaser from 'phaser';
 import {
@@ -29,10 +30,19 @@ export class CraneSystem {
   /** The trolley — a static body that slides along the rail */
   private trolley: MatterJS.BodyType;
 
-  /** The rope — a physics constraint between trolley and piece */
-  private rope: MatterJS.ConstraintType | null = null;
+  /**
+   * The hook — a tiny dynamic body at the end of the rope.
+   * This is permanent and always exists while the crane is alive.
+   */
+  private hook: MatterJS.BodyType;
 
-  /** The body currently attached to the rope */
+  /** The rope — permanent constraint between trolley and hook */
+  private rope: MatterJS.ConstraintType;
+
+  /** The clip — temporary constraint between hook and piece (null when no piece attached) */
+  private clip: MatterJS.ConstraintType | null = null;
+
+  /** The body currently clipped to the hook */
   private attachedBody: MatterJS.BodyType | null = null;
 
   /** Current trolley X position (pixels) */
@@ -51,10 +61,13 @@ export class CraneSystem {
     this.playRight = boardWidth - WALL_THICKNESS;
     this.trolleyX = boardWidth / 2;
 
-    // Create the trolley body — static so physics doesn't move it
+    const railY = TUNING.crane.railY;
+    const ropeLength = TUNING.crane.ropeLength;
+
+    // Create the trolley body — static, moves by code
     this.trolley = scene.matter.add.rectangle(
       this.trolleyX,
-      TUNING.crane.railY,
+      railY,
       30,
       10,
       {
@@ -62,8 +75,36 @@ export class CraneSystem {
         label: 'crane-trolley',
         collisionFilter: {
           category: CollisionCategory.CRANE,
-          mask: 0, // Collides with nothing
+          mask: 0,
         },
+      },
+    );
+
+    // Create the hook — tiny dynamic body at rope end
+    this.hook = scene.matter.add.circle(
+      this.trolleyX,
+      railY + ropeLength,
+      3, // tiny radius
+      {
+        label: 'crane-hook',
+        density: 0.004,
+        frictionAir: 0.01,
+        collisionFilter: {
+          category: CollisionCategory.CRANE,
+          mask: 0, // Hook doesn't collide with anything
+        },
+      },
+    );
+
+    // Create the permanent rope: trolley → hook
+    this.rope = scene.matter.add.constraint(
+      this.trolley,
+      this.hook,
+      ropeLength,
+      TUNING.crane.ropeStiffness,
+      {
+        damping: TUNING.crane.ropeDamping,
+        label: 'crane-rope',
       },
     );
 
@@ -71,44 +112,50 @@ export class CraneSystem {
   }
 
   /**
-   * Attach a piece body to the crane rope with material-specific tuning.
+   * Attach a piece to the hook via a short, stiff clip constraint.
    *
-   * LEARN: Matter.Constraint creates a spring-like connection between two
-   * bodies (or a body and a fixed point). The key parameters:
-   * - stiffness: How rigid (1 = rigid rod, 0 = very stretchy)
-   * - damping: How quickly oscillation dies (0 = swings forever)
-   * - length: Rest length of the constraint
-   *
-   * The twist in TRASH: each piece has a MATERIAL that overrides rope
-   * stiffness and damping. An aluminum piece (stiffness 0.7, damping 0.002)
-   * swings in wide arcs. A lead piece (stiffness 0.95, damping 0.02)
-   * barely moves. This means the player must adapt their timing to
-   * each piece's material — a core skill of the game.
+   * LEARN: The clip is much shorter and stiffer than the rope. It
+   * acts like a carabiner — rigidly connecting the piece to the hook
+   * so they move as one unit. Material-specific rope tuning now affects
+   * the ROPE (trolley→hook), not the clip, because the rope is what
+   * determines the pendulum feel.
    */
   attachPiece(body: MatterJS.BodyType, material?: MaterialDefinition): void {
-    const ropeLength = TUNING.crane.ropeLength;
+    // Detach any existing piece first
+    if (this.clip) {
+      this.scene.matter.world.removeConstraint(this.clip);
+      this.clip = null;
+      this.attachedBody = null;
+    }
+
+    // Update rope tuning based on material
     const ropeStiffness = material?.ropeStiffness ?? TUNING.crane.ropeStiffness;
     const ropeDamping = material?.ropeDamping ?? TUNING.crane.ropeDamping;
+    this.rope.stiffness = ropeStiffness;
+    this.rope.damping = ropeDamping;
 
-    // Position the piece below the trolley
+    // Position the piece at the hook
     this.scene.matter.body.setPosition(body, {
-      x: this.trolleyX,
-      y: TUNING.crane.railY + ropeLength,
+      x: this.hook.position.x,
+      y: this.hook.position.y + 15, // Slightly below the hook
     });
 
-    // Zero out any existing velocity
-    this.scene.matter.body.setVelocity(body, { x: 0, y: 0 });
+    // Match the hook's velocity so the piece doesn't jerk
+    this.scene.matter.body.setVelocity(body, {
+      x: this.hook.velocity.x,
+      y: this.hook.velocity.y,
+    });
     this.scene.matter.body.setAngularVelocity(body, 0);
 
-    // Create the rope constraint with material-specific tuning
-    this.rope = this.scene.matter.add.constraint(
-      this.trolley,
+    // Create the clip: hook → piece (short, very stiff)
+    this.clip = this.scene.matter.add.constraint(
+      this.hook,
       body,
-      ropeLength,
-      ropeStiffness,
+      5,    // Very short — piece hangs right on the hook
+      0.95, // Very stiff — piece and hook move as one
       {
-        damping: ropeDamping,
-        label: 'crane-rope',
+        damping: 0.1,
+        label: 'crane-clip',
       },
     );
 
@@ -116,48 +163,29 @@ export class CraneSystem {
   }
 
   /**
-   * Drop the piece — remove the constraint, let physics take over.
-   *
-   * LEARN: When we remove the constraint, the piece retains its current
-   * velocity vector. If it was swinging right, it continues moving right
-   * AND starts falling due to gravity. This creates satisfying arcing
-   * trajectories that reward timing skill.
+   * Drop the piece — remove the clip, let physics take over.
+   * The hook stays on the rope and keeps swinging.
    */
   dropPiece(): MatterJS.BodyType | null {
-    if (!this.rope || !this.attachedBody) return null;
+    if (!this.clip || !this.attachedBody) return null;
 
     const body = this.attachedBody;
 
-    // Remove the rope — piece keeps its velocity
-    this.scene.matter.world.removeConstraint(this.rope);
-    this.rope = null;
+    // Remove the clip — piece keeps its velocity, hook keeps swinging
+    this.scene.matter.world.removeConstraint(this.clip);
+    this.clip = null;
     this.attachedBody = null;
 
     return body;
   }
 
-  /**
-   * Update crane position from input actions.
-   *
-   * LEARN: Lerp (linear interpolation) is the single most useful function
-   * in game dev. Instead of teleporting to the target, we move a fraction
-   * of the remaining distance each frame. This creates smooth, responsive
-   * movement with natural acceleration and deceleration.
-   *
-   * Formula: current += (target - current) * lerpFactor
-   *
-   * With CRANE_LERP = 0.12, the trolley covers 12% of the remaining
-   * distance each frame. Fast at first, slowing as it approaches the target.
-   * This also amplifies the pendulum effect — the piece has inertia and
-   * can't keep up with the trolley's quick starts.
-   */
   update(actions: GameActions): void {
-    // If the attached piece was destroyed (e.g., glass shattered on wall),
-    // clean up the rope so the crane can accept a new piece
+    // If the attached piece was destroyed (e.g., glass shattered),
+    // clean up the clip. The hook and rope stay intact.
     if (this.attachedBody && !this.scene.matter.world.getAllBodies().includes(this.attachedBody)) {
-      if (this.rope) {
-        this.scene.matter.world.removeConstraint(this.rope);
-        this.rope = null;
+      if (this.clip) {
+        this.scene.matter.world.removeConstraint(this.clip);
+        this.clip = null;
       }
       this.attachedBody = null;
     }
@@ -171,7 +199,7 @@ export class CraneSystem {
     // Clamp to play area
     this.trolleyX = Phaser.Math.Clamp(this.trolleyX, this.playLeft, this.playRight);
 
-    // Move the static body (kinematic movement)
+    // Move the static trolley
     this.scene.matter.body.setPosition(this.trolley, {
       x: this.trolleyX,
       y: TUNING.crane.railY,
@@ -192,7 +220,7 @@ export class CraneSystem {
     return this.trolleyX;
   }
 
-  /** Draw the crane trolley, rail, and rope */
+  /** Draw the crane trolley, rail, rope, and hook */
   private draw(): void {
     this.graphics.clear();
 
@@ -209,12 +237,25 @@ export class CraneSystem {
     this.graphics.fillStyle(0x88aaff);
     this.graphics.fillRect(this.trolleyX - 15, railY - 5, 30, 10);
 
-    // Rope (line from trolley to attached piece)
+    // Rope: always drawn from trolley to hook (hook always exists)
+    this.graphics.lineStyle(2, 0xcccccc, 0.6);
+    this.graphics.lineBetween(
+      this.trolleyX,
+      railY,
+      this.hook.position.x,
+      this.hook.position.y,
+    );
+
+    // Hook dot
+    this.graphics.fillStyle(0xcccccc);
+    this.graphics.fillCircle(this.hook.position.x, this.hook.position.y, 3);
+
+    // Clip line from hook to piece (if attached)
     if (this.attachedBody) {
-      this.graphics.lineStyle(2, 0xcccccc, 0.6);
+      this.graphics.lineStyle(1, 0x999999, 0.4);
       this.graphics.lineBetween(
-        this.trolleyX,
-        railY,
+        this.hook.position.x,
+        this.hook.position.y,
         this.attachedBody.position.x,
         this.attachedBody.position.y,
       );
