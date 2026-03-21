@@ -284,19 +284,31 @@ export class GameInstance extends Phaser.Scene {
     const w = this.boardConfig.width;
     const h = this.boardConfig.height;
 
+    // Floor
     this.matter.add.rectangle(w / 2, h - WALL_THICKNESS / 2, w, WALL_THICKNESS, {
       isStatic: true,
       label: 'floor',
       collisionFilter: { category: 0x0001, mask: 0x0002 },
     });
 
-    this.matter.add.rectangle(WALL_THICKNESS / 2, h / 2, WALL_THICKNESS, h, {
+    /**
+     * LEARN: The side walls extend well above the visible board (extra 200px)
+     * to prevent pieces from swinging out over the top of the walls while
+     * hanging from the crane rope. Without this, a big pendulum arc could
+     * carry a piece outside the play area.
+     */
+    const wallHeight = h + 200;
+    const wallCenterY = (h - 200) / 2;
+
+    // Left wall
+    this.matter.add.rectangle(WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallHeight, {
       isStatic: true,
       label: 'wall-left',
       collisionFilter: { category: 0x0001, mask: 0x0002 },
     });
 
-    this.matter.add.rectangle(w - WALL_THICKNESS / 2, h / 2, WALL_THICKNESS, h, {
+    // Right wall
+    this.matter.add.rectangle(w - WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallHeight, {
       isStatic: true,
       label: 'wall-right',
       collisionFilter: { category: 0x0001, mask: 0x0002 },
