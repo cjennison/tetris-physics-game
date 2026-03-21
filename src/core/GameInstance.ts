@@ -121,7 +121,7 @@ export class GameInstance extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(10);
 
     // Dev console — toggle with ` key
-    this.devConsole = new DevConsole(this.pieceFactory);
+    this.devConsole = new DevConsole(this.pieceFactory, this.laserSystem);
 
     // Material indicator
     this.materialText = this.add.text(this.boardConfig.width / 2, GAME_HEIGHT - 35, '', {

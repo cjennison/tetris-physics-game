@@ -123,6 +123,29 @@ export class LaserSystem {
     this.draw();
   }
 
+  /** Get the number of laser lines */
+  getLaserCount(): number {
+    return this.lasers.length;
+  }
+
+  /** Force-fire a laser by index (0 = bottom, N-1 = top). Ignores cooldown and coverage. */
+  forceFire(index: number): void {
+    // Index 0 = bottom laser (last in array), so reverse
+    const reversed = [...this.lasers].reverse();
+    const laser = reversed[index];
+    if (!laser) return;
+
+    const bandHeight = TUNING.laser.bandHeight;
+    const bandTop = laser.y - bandHeight / 2;
+    const bandBottom = laser.y + bandHeight / 2;
+
+    const bodies = this.scene.matter.world.getAllBodies()
+      .filter(b => !b.isStatic && b.label?.startsWith('piece-'));
+
+    this.fireLaser(laser, bodies, bandTop, bandBottom);
+    laser.lastFiredAt = Date.now();
+  }
+
   /**
    * Compute what fraction of the laser band's width is covered by pieces.
    *

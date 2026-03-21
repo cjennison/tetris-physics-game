@@ -15,18 +15,22 @@
 import { PieceFactory } from '../pieces/PieceFactory';
 import { PIECE_DEFINITIONS } from '../pieces/PieceDefinitions';
 import { getAllMaterialKeys } from '../tuning';
+import { LaserSystem } from '../systems/LaserSystem';
 
 export class DevConsole {
   private container: HTMLDivElement;
   private visible = false;
   private factory: PieceFactory;
+  private laserSystem: LaserSystem;
 
   private shapeSelect!: HTMLSelectElement;
   private materialSelect!: HTMLSelectElement;
+  private laserSelect!: HTMLSelectElement;
   private statusLine!: HTMLDivElement;
 
-  constructor(factory: PieceFactory) {
+  constructor(factory: PieceFactory, laserSystem: LaserSystem) {
     this.factory = factory;
+    this.laserSystem = laserSystem;
     this.container = this.createDOM();
     document.body.appendChild(this.container);
     this.setupKeyboardToggle();
@@ -56,57 +60,67 @@ export class DevConsole {
     title.textContent = 'DEV CONSOLE — press ` to toggle';
     container.appendChild(title);
 
-    // Controls row
-    const row = document.createElement('div');
-    row.style.cssText = 'display: flex; gap: 10px; align-items: center; flex-wrap: wrap;';
-    container.appendChild(row);
+    // Row 1: Piece controls
+    const row1 = document.createElement('div');
+    row1.style.cssText = 'display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 6px;';
+    container.appendChild(row1);
 
-    // Shape selector
-    row.appendChild(this.createLabel('Shape:'));
+    row1.appendChild(this.createLabel('Shape:'));
     this.shapeSelect = this.createSelect(
       [{ value: '', label: 'Random' }, ...PIECE_DEFINITIONS.map(d => ({ value: d.name, label: d.name }))],
     );
     this.shapeSelect.addEventListener('change', () => {
-      const val = this.shapeSelect.value || null;
-      this.factory.setForcedShape(val);
+      this.factory.setForcedShape(this.shapeSelect.value || null);
       this.updateStatus();
     });
-    row.appendChild(this.shapeSelect);
+    row1.appendChild(this.shapeSelect);
 
-    // Material selector
-    row.appendChild(this.createLabel('Material:'));
+    row1.appendChild(this.createLabel('Material:'));
     const materialKeys = getAllMaterialKeys();
     this.materialSelect = this.createSelect(
       [{ value: '', label: 'Random' }, ...materialKeys.map(k => ({ value: k, label: k.charAt(0).toUpperCase() + k.slice(1) }))],
     );
     this.materialSelect.addEventListener('change', () => {
-      const val = this.materialSelect.value || null;
-      this.factory.setForcedMaterial(val);
+      this.factory.setForcedMaterial(this.materialSelect.value || null);
       this.updateStatus();
     });
-    row.appendChild(this.materialSelect);
+    row1.appendChild(this.materialSelect);
 
-    // Reset button
-    const resetBtn = document.createElement('button');
-    resetBtn.textContent = 'Reset';
-    resetBtn.style.cssText = `
-      background: #333;
-      color: #ccc;
-      border: 1px solid #555;
-      padding: 4px 12px;
-      font-family: monospace;
-      font-size: 12px;
-      cursor: pointer;
-      border-radius: 3px;
-    `;
-    resetBtn.addEventListener('click', () => {
+    const resetBtn = this.createButton('Reset', () => {
       this.shapeSelect.value = '';
       this.materialSelect.value = '';
       this.factory.setForcedShape(null);
       this.factory.setForcedMaterial(null);
       this.updateStatus();
     });
-    row.appendChild(resetBtn);
+    row1.appendChild(resetBtn);
+
+    // Row 2: Laser controls
+    const row2 = document.createElement('div');
+    row2.style.cssText = 'display: flex; gap: 10px; align-items: center; flex-wrap: wrap;';
+    container.appendChild(row2);
+
+    row2.appendChild(this.createLabel('Laser:'));
+    const laserCount = this.laserSystem.getLaserCount();
+    const laserOpts = [];
+    for (let i = 0; i < laserCount; i++) {
+      laserOpts.push({ value: String(i), label: `#${i} (${i === 0 ? 'bottom' : i === laserCount - 1 ? 'top' : 'mid'})` });
+    }
+    this.laserSelect = this.createSelect(laserOpts);
+    row2.appendChild(this.laserSelect);
+
+    const fireBtn = this.createButton('FIRE', () => {
+      const idx = parseInt(this.laserSelect.value, 10);
+      this.laserSystem.forceFire(idx);
+    }, '#ff4444');
+    row2.appendChild(fireBtn);
+
+    const fireAllBtn = this.createButton('Fire All', () => {
+      for (let i = 0; i < laserCount; i++) {
+        this.laserSystem.forceFire(i);
+      }
+    }, '#ff6600');
+    row2.appendChild(fireAllBtn);
 
     // Status line
     this.statusLine = document.createElement('div');
@@ -142,6 +156,23 @@ export class DevConsole {
       select.appendChild(el);
     }
     return select;
+  }
+
+  private createButton(text: string, onClick: () => void, color = '#ccc'): HTMLButtonElement {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.style.cssText = `
+      background: #333;
+      color: ${color};
+      border: 1px solid #555;
+      padding: 4px 12px;
+      font-family: monospace;
+      font-size: 12px;
+      cursor: pointer;
+      border-radius: 3px;
+    `;
+    btn.addEventListener('click', onClick);
+    return btn;
   }
 
   private setupKeyboardToggle(): void {
