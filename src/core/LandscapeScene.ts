@@ -105,36 +105,45 @@ export class LandscapeScene extends Phaser.Scene {
 
   private createWalls(): void {
     const wallThickness = 30;
-    const wallHeight = LANDSCAPE_HEIGHT * 2;
+    const wallFilter = { category: 0x0001, mask: 0x0002 | 0x0010 };
 
-    // Left wall — tall, extends above and below visible area
-    // Visual
+    /**
+     * LEARN: The left wall has a GAP where the chute exits. Pieces spawn
+     * off-screen and slide through this gap into the landscape. The wall
+     * is split into two parts: above the chute and below the chute.
+     */
+    const gapTop = 260;    // Top of chute opening
+    const gapBottom = 350; // Bottom of chute opening
+
+    // Left wall visual (with gap)
     const g = this.add.graphics();
     g.fillStyle(0x333344);
-    g.fillRect(0, 0, wallThickness, LANDSCAPE_HEIGHT);
+    g.fillRect(0, 0, wallThickness, gapTop);                                    // Above gap
+    g.fillRect(0, gapBottom, wallThickness, LANDSCAPE_HEIGHT - gapBottom);       // Below gap
     g.setDepth(6);
 
-    // Physics
+    // Left wall physics — above gap
+    const aboveH = gapTop;
     this.matter.add.rectangle(
-      wallThickness / 2, LANDSCAPE_HEIGHT / 2, wallThickness, wallHeight,
-      {
-        isStatic: true, label: 'wall-left',
-        collisionFilter: { category: 0x0001, mask: 0x0002 | 0x0010 },
-      },
+      wallThickness / 2, aboveH / 2, wallThickness, aboveH,
+      { isStatic: true, label: 'wall-left-above', collisionFilter: wallFilter },
+    );
+    // Left wall physics — below gap
+    const belowH = LANDSCAPE_HEIGHT - gapBottom + 200; // Extra below screen
+    this.matter.add.rectangle(
+      wallThickness / 2, gapBottom + belowH / 2, wallThickness, belowH,
+      { isStatic: true, label: 'wall-left-below', collisionFilter: wallFilter },
     );
 
-    // Right wall
+    // Right wall (solid, no gap)
     const g2 = this.add.graphics();
     g2.fillStyle(0x333344);
     g2.fillRect(LANDSCAPE_WIDTH - wallThickness, 0, wallThickness, LANDSCAPE_HEIGHT);
     g2.setDepth(6);
 
     this.matter.add.rectangle(
-      LANDSCAPE_WIDTH - wallThickness / 2, LANDSCAPE_HEIGHT / 2, wallThickness, wallHeight,
-      {
-        isStatic: true, label: 'wall-right',
-        collisionFilter: { category: 0x0001, mask: 0x0002 | 0x0010 },
-      },
+      LANDSCAPE_WIDTH - wallThickness / 2, LANDSCAPE_HEIGHT / 2, wallThickness, LANDSCAPE_HEIGHT * 2,
+      { isStatic: true, label: 'wall-right', collisionFilter: wallFilter },
     );
   }
 
