@@ -48,7 +48,31 @@ export class Terrain {
    */
   private createPhysicsSegments(): void {
     const collisionFilter = { category: 0x0001, mask: 0x0002 | 0x0010 };
-    const thickness = 30; // How thick each terrain segment is
+    const thickness = 30;
+
+    /**
+     * LEARN: An invisible bridge spans the column gap. It uses a special
+     * collision category (0x0020) that ONLY the vehicle collides with.
+     * Pieces (category 0x0002) ignore it completely and fall through
+     * into the column. The vehicle drives right over the column opening.
+     */
+    const bridgeCategory = 0x0020; // Vehicle-only bridge
+    const bridgeWidth = COLUMN_GAP_RIGHT - COLUMN_GAP_LEFT + 20; // Slight overlap
+    this.scene.matter.add.rectangle(
+      (COLUMN_GAP_LEFT + COLUMN_GAP_RIGHT) / 2,
+      COLUMN_GROUND_Y + 5, // Just below the surface line
+      bridgeWidth,
+      15, // Thin
+      {
+        isStatic: true,
+        label: 'column-bridge',
+        friction: 0.8,
+        collisionFilter: {
+          category: bridgeCategory,
+          mask: 0x0010, // Only collides with vehicle
+        },
+      },
+    );
 
     for (let i = 0; i < TERRAIN_POINTS.length - 1; i++) {
       const a = TERRAIN_POINTS[i]!;

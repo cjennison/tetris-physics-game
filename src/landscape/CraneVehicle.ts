@@ -78,7 +78,8 @@ export class CraneVehicle {
 
     const terrainY = Terrain.getHeightAt(startX);
     const chassisY = terrainY - WHEEL_RADIUS - VEHICLE_HEIGHT / 2 - 2;
-    const collisionMask = 0x0001 | CollisionCategory.PIECE;
+    // Vehicle collides with: terrain (0x0001), pieces (0x0002), and bridge (0x0020)
+    const collisionMask = 0x0001 | CollisionCategory.PIECE | 0x0020;
 
     // Chassis — raised above wheels
     this.chassis = scene.matter.add.rectangle(
