@@ -151,8 +151,23 @@ export class LandscapeScene extends Phaser.Scene {
   private setupCamera(): void {
     const cam = this.cameras.main;
 
-    // Start focused on the lower-left (pile area where the action begins)
-    cam.setZoom(1.0);
+    /**
+     * LEARN: The minimum zoom is calculated so the camera never shows
+     * area outside the landscape bounds. At min zoom, the entire
+     * landscape fills the viewport exactly. As the map grows (more
+     * columns), the min zoom decreases to accommodate.
+     *
+     * minZoom = max(viewportWidth/landscapeWidth, viewportHeight/landscapeHeight)
+     * This preserves aspect ratio — the tighter dimension constrains.
+     */
+    const minZoom = Math.max(
+      cam.width / LANDSCAPE_WIDTH,
+      cam.height / LANDSCAPE_HEIGHT,
+    );
+    const maxZoom = 2.0;
+
+    // Start focused on the lower-left (pile area)
+    cam.setZoom(Math.max(1.0, minZoom));
     cam.centerOn(300, 850);
 
     // Zoom with mouse wheel
@@ -162,7 +177,7 @@ export class LandscapeScene extends Phaser.Scene {
       _deltaX: number,
       deltaY: number,
     ) => {
-      const newZoom = Phaser.Math.Clamp(cam.zoom + (deltaY > 0 ? -0.05 : 0.05), 0.35, 2.0);
+      const newZoom = Phaser.Math.Clamp(cam.zoom + (deltaY > 0 ? -0.05 : 0.05), minZoom, maxZoom);
       cam.setZoom(newZoom);
     });
 
@@ -221,7 +236,7 @@ export class LandscapeScene extends Phaser.Scene {
           this.input.pointer2.x, this.input.pointer2.y,
         );
         if (pinchDist > 0) {
-          cam.setZoom(Phaser.Math.Clamp(cam.zoom * (newDist / pinchDist), 0.35, 2.0));
+          cam.setZoom(Phaser.Math.Clamp(cam.zoom * (newDist / pinchDist), minZoom, maxZoom));
         }
         pinchDist = newDist;
       }
