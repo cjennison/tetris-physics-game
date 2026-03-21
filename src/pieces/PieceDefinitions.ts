@@ -1,61 +1,121 @@
 /**
  * PieceDefinitions — Vertex data for all TRASH piece shapes
  *
- * LEARN: In physics-based games, shapes are defined as vertex arrays.
- * Unlike grid-based Tetris where pieces are 4 squares, here each piece
- * is a polygon. Matter.js needs vertices to create physics bodies.
+ * LEARN: Each shape is defined as a polygon outline in local coordinates.
+ * 1 unit = 1 cell. Shapes are scaled by PIECE_SCALE (25px) when spawned.
  *
- * Vertices are in LOCAL coordinates (centered around 0,0) and scaled
- * by PIECE_SCALE when spawned. Winding is counter-clockwise (required by PolyK).
+ * These match the classic Tetris tetromino layouts but as continuous
+ * polygons for physics. Each shape traces the OUTLINE of the cells
+ * that make up the piece, counter-clockwise.
+ *
+ * Visual reference (each # is one cell):
+ *
+ * I-Block:  ####          O-Block:  ##
+ *                                   ##
+ *
+ * T-Block:  .#.           S-Block:  .##
+ *           ###                     ##.
+ *
+ * Z-Block:  ##.           L-Block:  #..
+ *           .##                     #..
+ *                                   ##.
+ *
+ * J-Block:  .#            P-Block:  ##
+ *           .#                      .#
+ *           ##                      .#
  */
 import { PieceDefinition } from '../types';
 
-/**
- * Standard Tetromino-inspired shapes, but as continuous polygons.
- * Each shape approximates the classic Tetris piece but as a solid polygon
- * rather than 4 discrete squares.
- */
 export const PIECE_DEFINITIONS: PieceDefinition[] = [
   {
     name: 'I-Block',
-    // Long horizontal bar (4x1)
+    // ####  (4 wide, 1 tall)
     vertices: [-2, -0.5, 2, -0.5, 2, 0.5, -2, 0.5],
     color: 0x00f0f0,
   },
   {
     name: 'O-Block',
-    // Square (2x2)
+    // ##  (2x2 square)
+    // ##
     vertices: [-1, -1, 1, -1, 1, 1, -1, 1],
     color: 0xf0f000,
   },
   {
     name: 'T-Block',
-    // T-shape
-    vertices: [-1.5, -0.5, -0.5, -0.5, -0.5, -1.5, 0.5, -1.5, 0.5, -0.5, 1.5, -0.5, 1.5, 0.5, -1.5, 0.5],
+    //  #     (bump on top, 3 wide base)
+    // ###
+    vertices: [
+      -1.5, 0,    // bottom-left
+      -1.5, -1,   // left side up
+      -0.5, -1,   // inner left shoulder
+      -0.5, -2,   // top-left of bump
+       0.5, -2,   // top-right of bump
+       0.5, -1,   // inner right shoulder
+       1.5, -1,   // right side
+       1.5, 0,    // bottom-right
+    ],
     color: 0xa000f0,
   },
   {
     name: 'S-Block',
-    // S-shape (zigzag)
-    vertices: [-1.5, 0, -1.5, -1, -0.5, -1, -0.5, -2, 0.5, -2, 0.5, -1, 1.5, -1, 1.5, 0],
+    //  ##   (offset right on top)
+    // ##
+    vertices: [
+      -1.5, 0,    // bottom-left
+      -1.5, -1,   // up left
+      -0.5, -1,   // step in
+      -0.5, -2,   // up to top row
+       1.5, -2,   // top-right
+       1.5, -1,   // down right
+       0.5, -1,   // step in
+       0.5, 0,    // down to bottom
+    ],
     color: 0x00f000,
   },
   {
     name: 'Z-Block',
-    // Z-shape (reverse zigzag)
-    vertices: [-1.5, -2, -1.5, -1, -0.5, -1, -0.5, 0, 0.5, 0, 0.5, -1, 1.5, -1, 1.5, -2],
+    // ##    (offset left on top)
+    //  ##
+    vertices: [
+      -1.5, -2,   // top-left
+      -1.5, -1,   // down left
+      -0.5, -1,   // step right
+      -0.5, 0,    // down to bottom
+       1.5, 0,    // bottom-right
+       1.5, -1,   // up right
+       0.5, -1,   // step left
+       0.5, -2,   // up to top
+    ],
     color: 0xf00000,
   },
   {
     name: 'L-Block',
-    // L-shape
-    vertices: [-1, -1.5, 0, -1.5, 0, -0.5, 1, -0.5, 1, 0.5, -1, 0.5],
+    // #      (3 tall, foot extends right)
+    // #
+    // ##
+    vertices: [
+      -0.5, -3,   // top-left
+       0.5, -3,   // top-right
+       0.5, -1,   // down to foot level
+       1.5, -1,   // foot extends right
+       1.5, 0,    // foot bottom-right
+      -0.5, 0,    // bottom-left
+    ],
     color: 0xf0a000,
   },
   {
     name: 'J-Block',
-    // J-shape (reverse L)
-    vertices: [0, -1.5, 1, -1.5, 1, 0.5, -1, 0.5, -1, -0.5, 0, -0.5],
+    //  #     (3 tall, foot extends left)
+    //  #
+    // ##
+    vertices: [
+      -0.5, -3,   // top-left
+       0.5, -3,   // top-right
+       0.5, 0,    // down right side
+      -1.5, 0,    // foot bottom-left
+      -1.5, -1,   // foot top-left
+      -0.5, -1,   // inner corner
+    ],
     color: 0x0000f0,
   },
 ];

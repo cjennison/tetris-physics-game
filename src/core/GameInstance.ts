@@ -54,14 +54,8 @@ export class GameInstance extends Phaser.Scene {
   // Active piece tracking
   private activePiece: SpawnedPiece | null = null;
 
-  /**
-   * LEARN: Settling detection uses a "frame counter" pattern.
-   * Instead of checking if velocity is zero on ONE frame (too noisy —
-   * physics bodies jitter), we check if velocity has been below a
-   * threshold for N consecutive frames. This filters out brief pauses
-   * during bouncing.
-   */
-  private settleCounter = 0;
+  /** Timestamp when the piece was dropped — used for the settle timer */
+  private dropTime = 0;
 
   // Wall graphics (drawn once, not every frame)
   private wallGraphics!: Phaser.GameObjects.Graphics;
@@ -149,10 +143,6 @@ export class GameInstance extends Phaser.Scene {
         this.handleDropping();
         break;
 
-      case 'settling':
-        this.handleSettling();
-        break;
-
       case 'laser_check':
         // Lasers not implemented yet — skip to spawning
         this.setState('spawning');
@@ -200,7 +190,6 @@ export class GameInstance extends Phaser.Scene {
     this.activePiece = spawned;
     this.pieceRenderer.addBody(spawned.body);
     this.craneSystem.attachPiece(spawned.body, spawned.material);
-    this.settleCounter = 0;
 
     this.materialText.setText(`${spawned.material.label} ${spawned.definition.name}`);
 
@@ -239,71 +228,47 @@ export class GameInstance extends Phaser.Scene {
     if (actions.drop) {
       const droppedBody = this.craneSystem.dropPiece();
       if (droppedBody) {
+        this.dropTime = Date.now();
         this.events.emit(EventBus.PIECE_DROPPED);
         this.setState('dropping');
       }
     }
   }
 
-  /** DROPPING: Piece is falling. Watch for it to start settling. */
-  private handleDropping(): void {
-    // Keep updating crane position (visual only — no piece attached)
-    const actions = this.inputSystem.getActions();
-    this.craneSystem.update(actions);
-
-    if (!this.activePiece || this.isBodyDestroyed(this.activePiece.body)) {
-      /**
-       * LEARN: If the active piece body was destroyed (e.g., glass shattered
-       * on impact), we skip straight to spawning. The shards are independent
-       * bodies now — the "active piece" no longer exists. Without this check,
-       * the state machine would stall reading velocity from a dead body.
-       */
-      this.activePiece = null;
-      this.setState('laser_check');
-      return;
-    }
-
-    const vel = this.activePiece.body.velocity;
-    const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
-
-    if (speed < TUNING.settling.velocityThreshold) {
-      this.setState('settling');
-    }
-  }
-
   /**
-   * SETTLING: Piece velocity is low. Wait for it to stay low for
-   * N consecutive frames before declaring it settled.
+   * DROPPING: Piece is falling. After 1 second, move to next piece.
+   *
+   * LEARN: Instead of tracking velocity and waiting for the piece to
+   * fully stop (which can take ages with bouncing rubber or sliding
+   * shards), we use a simple timer. 1 second is enough for the piece
+   * to land and the player to see where it went, but fast enough to
+   * keep the game feeling snappy. The piece continues settling
+   * physically in the background — it doesn't freeze.
    */
-  private handleSettling(): void {
+  private handleDropping(): void {
     const actions = this.inputSystem.getActions();
+    if (this.testCraneTarget !== null && this.testCraneTarget >= 0) {
+      actions.horizontalTarget = this.testCraneTarget;
+    }
     this.craneSystem.update(actions);
 
-    if (!this.activePiece || this.isBodyDestroyed(this.activePiece.body)) {
+    // If the piece was destroyed (glass shatter), move on immediately
+    if (this.activePiece && this.isBodyDestroyed(this.activePiece.body)) {
       this.activePiece = null;
       this.setState('laser_check');
       return;
     }
 
-    const vel = this.activePiece.body.velocity;
-    const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
-
-    if (speed < TUNING.settling.velocityThreshold) {
-      this.settleCounter++;
-      if (this.settleCounter >= TUNING.settling.frameCount) {
-        // Piece is settled — check for game over, then move on
-        if (this.checkGameOver()) {
-          this.setState('game_over');
-        } else {
-          this.events.emit(EventBus.PIECE_SETTLED);
-          this.activePiece = null;
-          this.setState('laser_check');
-        }
+    // After 1 second, move to next piece
+    const elapsed = Date.now() - this.dropTime;
+    if (elapsed >= 1000) {
+      if (this.checkGameOver()) {
+        this.setState('game_over');
+      } else {
+        this.events.emit(EventBus.PIECE_SETTLED);
+        this.activePiece = null;
+        this.setState('laser_check');
       }
-    } else {
-      // Piece started moving again (bounced) — go back to dropping
-      this.settleCounter = 0;
-      this.setState('dropping');
     }
   }
 
@@ -316,6 +281,7 @@ export class GameInstance extends Phaser.Scene {
   testDrop(): void {
     if (this.state === 'swinging') {
       this.craneSystem.dropPiece();
+      this.dropTime = Date.now();
       this.events.emit(EventBus.PIECE_DROPPED);
       this.setState('dropping');
     }
