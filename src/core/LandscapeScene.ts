@@ -153,8 +153,8 @@ export class LandscapeScene extends Phaser.Scene {
     const wallFilter = { category: 0x0001, mask: 0x0002 | 0x0010 };
 
     // Left wall gap for chute (Y 380–580)
-    const gapTop = 380;
-    const gapBottom = 580;
+    const gapTop = 80;
+    const gapBottom = 250;
 
     // Left wall — above gap
     const g = this.add.graphics();

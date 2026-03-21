@@ -12,8 +12,8 @@ import { PILE_LEFT, PILE_RIGHT } from '../config';
 import { Terrain } from './Terrain';
 
 /** Where pieces eject from */
-const EJECT_X = 40;    // Just past the left wall
-const EJECT_Y = 500;   // Upper-left area
+const EJECT_X = 45;    // Just past the left wall
+const EJECT_Y = 150;   // Top-left corner of the map
 const EJECT_VX = 3;    // Horizontal velocity (rightward)
 const EJECT_VY = 0.5;  // Slight downward
 
