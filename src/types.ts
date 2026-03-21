@@ -1,0 +1,60 @@
+/**
+ * TRASH Game — Shared Type Definitions
+ *
+ * LEARN: In game dev, you define your data shapes upfront so every system
+ * agrees on what a "piece", "action", or "board config" looks like.
+ * This prevents bugs where one system expects { x, y } and another sends { pos }.
+ */
+
+/** Actions that can be performed on a game board — by human OR AI */
+export interface GameActions {
+  /** Target X position for the crane (0.0 = left edge, 1.0 = right edge) */
+  horizontalTarget: number;
+  /** True on the frame the player wants to drop the piece */
+  drop: boolean;
+}
+
+/** Configuration for a single game board instance */
+export interface BoardConfig {
+  /** Board ID — unique per instance */
+  id: string;
+  /** Viewport position (pixels from left of canvas) */
+  x: number;
+  /** Viewport position (pixels from top of canvas) */
+  y: number;
+  /** Board width in pixels */
+  width: number;
+  /** Board height in pixels */
+  height: number;
+  /** Number of laser lines */
+  laserCount: number;
+  /** Who controls this board */
+  controller: 'human' | 'ai';
+}
+
+/** The state machine for a single game board */
+export type GameState =
+  | 'spawning'    // Creating next piece on crane
+  | 'swinging'    // Player controlling crane, piece swinging
+  | 'dropping'    // Piece released, falling
+  | 'settling'    // Waiting for piece to come to rest
+  | 'laser_check' // Checking laser coverage
+  | 'game_over';  // Pile reached crane height
+
+/** A piece shape definition — vertices in local coordinates */
+export interface PieceDefinition {
+  /** Display name (e.g., "T-Block", "L-Block") */
+  name: string;
+  /** Flat vertex array [x1,y1, x2,y2, ...] — counter-clockwise winding */
+  vertices: number[];
+  /** Color for rendering */
+  color: number;
+}
+
+/** Collision categories — bit flags for Matter.js filtering */
+export const CollisionCategory = {
+  WALL:   0x0001,
+  PIECE:  0x0002,
+  CRANE:  0x0004,
+  SENSOR: 0x0008,
+} as const;

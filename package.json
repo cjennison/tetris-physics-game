@@ -1,0 +1,23 @@
+{
+  "name": "trash-game",
+  "version": "0.1.0",
+  "description": "TRASH — A physics-based Tetris game with crane mechanics",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0",
+    "poly-decomp": "^0.3.0"
+  },
+  "devDependencies": {
+    "typescript": "~5.7.0",
+    "vite": "^6.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
