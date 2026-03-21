@@ -109,6 +109,17 @@ export class SpecialMaterialSystem {
     if (!handler) return;
 
     /**
+     * LEARN: "Invulnerability frames" (i-frames) are a classic game dev
+     * pattern. After a piece is created (spawned or shattered into fragments),
+     * it's immune to special effects for a short window. This prevents:
+     * - New crane pieces shattering instantly on nearby debris
+     * - Freshly created fragments immediately re-shattering
+     * - Chain reactions from overlapping fragments at creation time
+     */
+    const IMMUNITY_MS = 500;
+    if (Date.now() - data.createdAt < IMMUNITY_MS) return;
+
+    /**
      * LEARN: Impact force approximation. Matter.js doesn't directly give
      * us "force" from a collision, but we can estimate it from:
      * - collision.depth: how far the bodies overlapped (penetration depth)

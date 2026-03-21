@@ -27,6 +27,8 @@ export interface PieceUserData {
   materialKey: string;
   /** Full material properties — used by CraneSystem for rope tuning */
   material: MaterialDefinition;
+  /** Timestamp when this body was created — used for shatter immunity */
+  createdAt: number;
 }
 
 /** Result of creating a piece — includes the body and its material info */
@@ -175,6 +177,7 @@ export class PieceFactory {
       settled: false,
       materialKey,
       material,
+      createdAt: Date.now(),
     };
 
     return body;

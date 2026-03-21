@@ -136,6 +136,7 @@ export const concreteCollisionHandler: MaterialCollisionHandler = (
         ...info.data,
         name: 'Concrete-half',
         settled: false,
+        createdAt: Date.now(),
       };
 
       /**

@@ -142,6 +142,7 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
         ...info.data,
         name: 'Glass-shard',
         settled: false,
+        createdAt: Date.now(),
       };
 
       const scatterMag = Math.min(config.scatterForce, 3);
