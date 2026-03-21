@@ -184,7 +184,23 @@ export class PieceFactory {
   }
 }
 
-/** Helper to get game data from a piece body */
+/**
+ * Helper to get game data from a piece body.
+ *
+ * LEARN: For compound bodies (concave shapes decomposed by poly-decomp),
+ * Matter.js fires collision events for the individual SUB-PARTS, not
+ * the parent body. But gameData is only on the parent. So we check
+ * the body first, then walk up to body.parent if needed. Without this,
+ * T-Block, S-Block, Z-Block, L-Block, and J-Block would never trigger
+ * special material handlers because their sub-parts have no gameData.
+ */
 export function getPieceData(body: MatterJS.BodyType): PieceUserData | undefined {
-  return (body as MatterJS.BodyType & { gameData?: PieceUserData }).gameData;
+  const data = (body as MatterJS.BodyType & { gameData?: PieceUserData }).gameData;
+  if (data) return data;
+  // Check parent for compound bodies
+  const parent = (body as MatterJS.BodyType & { parent?: MatterJS.BodyType }).parent;
+  if (parent && parent !== body) {
+    return (parent as MatterJS.BodyType & { gameData?: PieceUserData }).gameData;
+  }
+  return undefined;
 }

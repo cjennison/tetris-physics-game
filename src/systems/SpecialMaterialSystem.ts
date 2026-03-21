@@ -97,55 +97,51 @@ export class SpecialMaterialSystem {
     otherBody: MatterJS.BodyType,
     collision: MatterJS.ICollisionData,
   ): void {
-    // Skip if already processed this frame
-    if (this.processedThisFrame.has(body.id)) return;
+    /**
+     * LEARN: For compound bodies (concave shapes like T, S, Z, L, J),
+     * Matter.js fires collision events for individual SUB-PARTS, not
+     * the parent body. But our gameData and handlers operate on the
+     * parent. So we resolve to the parent body first. If the collision
+     * body IS the parent (simple convex shape), this is a no-op.
+     */
+    const parentBody = (body as MatterJS.BodyType & { parent?: MatterJS.BodyType }).parent ?? body;
+    const parentOther = (otherBody as MatterJS.BodyType & { parent?: MatterJS.BodyType }).parent ?? otherBody;
 
-    // Get piece data — skip if not a piece or no material
-    const data = getPieceData(body);
+    // Skip if already processed this frame (use parent ID for compound bodies)
+    if (this.processedThisFrame.has(parentBody.id)) return;
+
+    // Get piece data from parent
+    const data = getPieceData(parentBody);
     if (!data) return;
 
     // Check if this material has a special handler
     const handler = this.handlers.get(data.materialKey);
     if (!handler) return;
 
-    /**
-     * LEARN: "Invulnerability frames" (i-frames) are a classic game dev
-     * pattern. After a piece is created (spawned or shattered into fragments),
-     * it's immune to special effects for a short window. This prevents:
-     * - New crane pieces shattering instantly on nearby debris
-     * - Freshly created fragments immediately re-shattering
-     * - Chain reactions from overlapping fragments at creation time
-     */
+    // Invulnerability frames — prevent chain reactions
     const IMMUNITY_MS = 500;
     if (Date.now() - data.createdAt < IMMUNITY_MS) return;
 
-    /**
-     * LEARN: Impact force approximation. Matter.js doesn't directly give
-     * us "force" from a collision, but we can estimate it from:
-     * - collision.depth: how far the bodies overlapped (penetration depth)
-     * - body velocity: how fast the body was moving at impact
-     *
-     * Multiplying these gives a rough "impact energy" — enough to decide
-     * if glass should shatter (high impact) or just clink (low impact).
-     */
-    const vel = body.velocity;
+    // Use the parent body's velocity for impact calculation
+    const vel = parentBody.velocity;
     const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
     const impactForce = (collision.depth ?? 0) * speed;
 
+    // Contact point from the collision (sub-part level, which is correct)
     const supports = collision.supports ?? [];
     const contactPoint = supports.length > 0
       ? { x: supports[0]!.x, y: supports[0]!.y }
-      : { x: body.position.x, y: body.position.y };
+      : { x: parentBody.position.x, y: parentBody.position.y };
 
     const normal = collision.normal
       ? { x: collision.normal.x, y: collision.normal.y }
       : { x: 0, y: -1 };
 
-    // Mark as processed before handling (handler might destroy the body)
-    this.processedThisFrame.add(body.id);
+    // Mark PARENT as processed (handler might destroy it)
+    this.processedThisFrame.add(parentBody.id);
 
     const newBodies = handler(
-      { body, data, otherBody, contactPoint, normal, impactForce },
+      { body: parentBody, data, otherBody: parentOther, contactPoint, normal, impactForce },
       this.scene,
       this.renderer,
     );
