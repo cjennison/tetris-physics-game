@@ -26,13 +26,11 @@ import { EventBus } from './EventBus';
 import { CraneSystem } from '../systems/CraneSystem';
 import { InputSystem } from '../systems/InputSystem';
 import { PieceRenderer } from '../systems/PieceRenderer';
-import { PieceFactory } from '../pieces/PieceFactory';
+import { PieceFactory, type SpawnedPiece } from '../pieces/PieceFactory';
+import { TUNING } from '../tuning';
 import {
-  CRANE_RAIL_Y,
   WALL_THICKNESS,
   GAME_HEIGHT,
-  SETTLE_VELOCITY,
-  SETTLE_FRAMES,
 } from '../config';
 
 export class GameInstance extends Phaser.Scene {
@@ -47,7 +45,7 @@ export class GameInstance extends Phaser.Scene {
   private pieceFactory!: PieceFactory;
 
   // Active piece tracking
-  private activePiece: MatterJS.BodyType | null = null;
+  private activePiece: SpawnedPiece | null = null;
 
   /**
    * LEARN: Settling detection uses a "frame counter" pattern.
@@ -63,6 +61,7 @@ export class GameInstance extends Phaser.Scene {
 
   // Status text
   private stateText!: Phaser.GameObjects.Text;
+  private materialText!: Phaser.GameObjects.Text;
 
   constructor(config: BoardConfig) {
     super({ key: config.id });
@@ -95,6 +94,13 @@ export class GameInstance extends Phaser.Scene {
     this.stateText = this.add.text(this.boardConfig.width / 2, 15, '', {
       fontSize: '12px',
       color: '#666688',
+      fontFamily: 'monospace',
+    }).setOrigin(0.5).setDepth(10);
+
+    // Material indicator
+    this.materialText = this.add.text(this.boardConfig.width / 2, GAME_HEIGHT - 35, '', {
+      fontSize: '14px',
+      color: '#aaaaaa',
       fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(10);
 
@@ -140,19 +146,23 @@ export class GameInstance extends Phaser.Scene {
 
   /** SPAWNING: Create a new piece and attach it to the crane */
   private handleSpawning(): void {
-    const def = this.pieceFactory.nextDefinition();
-    const body = this.pieceFactory.createBody(
-      def,
+    const spawned = this.pieceFactory.spawnPiece(
       this.boardConfig.width / 2,
-      CRANE_RAIL_Y + 50, // Temporary position — crane will reposition it
+      TUNING.crane.railY + 50,
     );
 
-    this.activePiece = body;
-    this.pieceRenderer.addBody(body);
-    this.craneSystem.attachPiece(body);
+    this.activePiece = spawned;
+    this.pieceRenderer.addBody(spawned.body);
+    this.craneSystem.attachPiece(spawned.body, spawned.material);
     this.settleCounter = 0;
 
-    this.events.emit(EventBus.PIECE_SPAWNED, { name: def.name });
+    // Show material label so the player knows what they're working with
+    this.materialText.setText(`${spawned.material.label} ${spawned.definition.name}`);
+
+    this.events.emit(EventBus.PIECE_SPAWNED, {
+      name: spawned.definition.name,
+      material: spawned.materialKey,
+    });
     this.setState('swinging');
   }
 
@@ -194,17 +204,17 @@ export class GameInstance extends Phaser.Scene {
      * individual x/y components. A piece sliding sideways at high speed
      * shouldn't count as "settled" even if its Y velocity is low.
      */
-    const vel = this.activePiece.velocity;
+    const vel = this.activePiece.body.velocity;
     const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
 
-    if (speed < SETTLE_VELOCITY) {
+    if (speed < TUNING.settling.velocityThreshold) {
       this.setState('settling');
     }
   }
 
   /**
    * SETTLING: Piece velocity is low. Wait for it to stay low for
-   * SETTLE_FRAMES consecutive frames before declaring it settled.
+   * N consecutive frames before declaring it settled.
    */
   private handleSettling(): void {
     const actions = this.inputSystem.getActions();
@@ -215,12 +225,12 @@ export class GameInstance extends Phaser.Scene {
       return;
     }
 
-    const vel = this.activePiece.velocity;
+    const vel = this.activePiece.body.velocity;
     const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
 
-    if (speed < SETTLE_VELOCITY) {
+    if (speed < TUNING.settling.velocityThreshold) {
       this.settleCounter++;
-      if (this.settleCounter >= SETTLE_FRAMES) {
+      if (this.settleCounter >= TUNING.settling.frameCount) {
         // Piece is settled — check for game over, then move on
         if (this.checkGameOver()) {
           this.setState('game_over');
@@ -246,7 +256,7 @@ export class GameInstance extends Phaser.Scene {
     for (const body of bodies) {
       if (body.isStatic) continue;
       if (body.label?.startsWith('piece-')) {
-        if (body.bounds.min.y < CRANE_RAIL_Y + 20) {
+        if (body.bounds.min.y < TUNING.crane.railY + 20) {
           return true;
         }
       }
@@ -305,11 +315,12 @@ export class GameInstance extends Phaser.Scene {
     this.wallGraphics.fillRect(w - WALL_THICKNESS, 0, WALL_THICKNESS, this.boardConfig.height);
 
     // Laser line guides (faint)
-    const playHeight = this.boardConfig.height - WALL_THICKNESS - CRANE_RAIL_Y;
+    const railY = TUNING.crane.railY;
+    const playHeight = this.boardConfig.height - WALL_THICKNESS - railY;
     const spacing = playHeight / (this.boardConfig.laserCount + 1);
     this.wallGraphics.lineStyle(1, 0xff4444, 0.15);
     for (let i = 1; i <= this.boardConfig.laserCount; i++) {
-      const y = CRANE_RAIL_Y + spacing * i;
+      const y = railY + spacing * i;
       this.wallGraphics.lineBetween(WALL_THICKNESS, y, w - WALL_THICKNESS, y);
     }
 

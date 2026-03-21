@@ -1,0 +1,110 @@
+{
+  "_doc": "TRASH Game Tuning — edit values here to change game feel. No code changes needed.",
+
+  "physics": {
+    "gravity": 1.5,
+    "constraintIterations": 4
+  },
+
+  "board": {
+    "width": 480,
+    "height": 800,
+    "wallThickness": 20
+  },
+
+  "crane": {
+    "railY": 40,
+    "ropeLength": 100,
+    "ropeStiffness": 0.9,
+    "ropeDamping": 0.005,
+    "lerpSpeed": 0.12,
+    "_lerpDoc": "0-1. Higher = crane follows input faster. Lower = more momentum/swing."
+  },
+
+  "laser": {
+    "bandHeight": 30,
+    "coverageThreshold": 0.90,
+    "cooldownMs": 2000,
+    "lineSpacing": 80
+  },
+
+  "settling": {
+    "velocityThreshold": 0.3,
+    "frameCount": 30,
+    "_doc": "Piece must stay below velocityThreshold for frameCount consecutive frames to count as settled."
+  },
+
+  "pieces": {
+    "scale": 25,
+    "minFragmentArea": 100
+  },
+
+  "materials": {
+    "_doc": "Each material changes how a piece behaves on the crane and after dropping. density affects swing inertia (heavier = less swing). ropeStiffness/ropeDamping override the crane defaults per-material. restitution = bounciness, friction = grip.",
+
+    "aluminum": {
+      "label": "Aluminum",
+      "density": 0.001,
+      "restitution": 0.15,
+      "friction": 0.4,
+      "frictionStatic": 0.5,
+      "ropeStiffness": 0.7,
+      "ropeDamping": 0.002,
+      "weight": 3,
+      "_feel": "Light and swingy — big pendulum arcs, bounces a bit on landing"
+    },
+    "steel": {
+      "label": "Steel",
+      "density": 0.003,
+      "restitution": 0.08,
+      "friction": 0.6,
+      "frictionStatic": 0.8,
+      "ropeStiffness": 0.9,
+      "ropeDamping": 0.005,
+      "weight": 5,
+      "_feel": "Standard weight — moderate swing, stacks well"
+    },
+    "lead": {
+      "label": "Lead",
+      "density": 0.006,
+      "restitution": 0.02,
+      "friction": 0.8,
+      "frictionStatic": 1.0,
+      "ropeStiffness": 0.95,
+      "ropeDamping": 0.02,
+      "weight": 8,
+      "_feel": "Very heavy — barely swings, dead drop, high friction keeps it in place"
+    },
+    "rubber": {
+      "label": "Rubber",
+      "density": 0.0015,
+      "restitution": 0.5,
+      "friction": 0.9,
+      "frictionStatic": 1.2,
+      "ropeStiffness": 0.5,
+      "ropeDamping": 0.001,
+      "weight": 2,
+      "_feel": "Light and bouncy — big swings AND bounces on landing, unpredictable"
+    },
+    "concrete": {
+      "label": "Concrete",
+      "density": 0.004,
+      "restitution": 0.03,
+      "friction": 0.7,
+      "frictionStatic": 0.9,
+      "ropeStiffness": 0.92,
+      "ropeDamping": 0.01,
+      "weight": 7,
+      "_feel": "Heavy and rough — minimal swing, doesn't slide, solid foundation piece"
+    }
+  },
+
+  "materialWeights": {
+    "_doc": "Probability weights for each material. Higher = more common. The game rolls a weighted random to pick a material for each new piece.",
+    "aluminum": 3,
+    "steel": 5,
+    "lead": 1,
+    "rubber": 2,
+    "concrete": 2
+  }
+}

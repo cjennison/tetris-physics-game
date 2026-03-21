@@ -18,14 +18,10 @@
  */
 import Phaser from 'phaser';
 import {
-  CRANE_RAIL_Y,
-  CRANE_LERP,
-  ROPE_LENGTH,
-  ROPE_STIFFNESS,
-  ROPE_DAMPING,
   WALL_THICKNESS,
 } from '../config';
-import { GameActions, CollisionCategory } from '../types';
+import { TUNING } from '../tuning';
+import { GameActions, MaterialDefinition, CollisionCategory } from '../types';
 
 export class CraneSystem {
   private scene: Phaser.Scene;
@@ -58,7 +54,7 @@ export class CraneSystem {
     // Create the trolley body — static so physics doesn't move it
     this.trolley = scene.matter.add.rectangle(
       this.trolleyX,
-      CRANE_RAIL_Y,
+      TUNING.crane.railY,
       30,
       10,
       {
@@ -75,7 +71,7 @@ export class CraneSystem {
   }
 
   /**
-   * Attach a piece body to the crane rope.
+   * Attach a piece body to the crane rope with material-specific tuning.
    *
    * LEARN: Matter.Constraint creates a spring-like connection between two
    * bodies (or a body and a fixed point). The key parameters:
@@ -83,29 +79,35 @@ export class CraneSystem {
    * - damping: How quickly oscillation dies (0 = swings forever)
    * - length: Rest length of the constraint
    *
-   * We set the piece's initial position to directly below the trolley,
-   * then create the constraint. The piece will hang straight down until
-   * the trolley starts moving.
+   * The twist in TRASH: each piece has a MATERIAL that overrides rope
+   * stiffness and damping. An aluminum piece (stiffness 0.7, damping 0.002)
+   * swings in wide arcs. A lead piece (stiffness 0.95, damping 0.02)
+   * barely moves. This means the player must adapt their timing to
+   * each piece's material — a core skill of the game.
    */
-  attachPiece(body: MatterJS.BodyType): void {
+  attachPiece(body: MatterJS.BodyType, material?: MaterialDefinition): void {
+    const ropeLength = TUNING.crane.ropeLength;
+    const ropeStiffness = material?.ropeStiffness ?? TUNING.crane.ropeStiffness;
+    const ropeDamping = material?.ropeDamping ?? TUNING.crane.ropeDamping;
+
     // Position the piece below the trolley
     this.scene.matter.body.setPosition(body, {
       x: this.trolleyX,
-      y: CRANE_RAIL_Y + ROPE_LENGTH,
+      y: TUNING.crane.railY + ropeLength,
     });
 
     // Zero out any existing velocity
     this.scene.matter.body.setVelocity(body, { x: 0, y: 0 });
     this.scene.matter.body.setAngularVelocity(body, 0);
 
-    // Create the rope constraint
+    // Create the rope constraint with material-specific tuning
     this.rope = this.scene.matter.add.constraint(
       this.trolley,
       body,
-      ROPE_LENGTH,
-      ROPE_STIFFNESS,
+      ropeLength,
+      ropeStiffness,
       {
-        damping: ROPE_DAMPING,
+        damping: ropeDamping,
         label: 'crane-rope',
       },
     );
@@ -154,7 +156,7 @@ export class CraneSystem {
     const targetX = this.playLeft + actions.horizontalTarget * (this.playRight - this.playLeft);
 
     // Lerp toward target
-    this.trolleyX += (targetX - this.trolleyX) * CRANE_LERP;
+    this.trolleyX += (targetX - this.trolleyX) * TUNING.crane.lerpSpeed;
 
     // Clamp to play area
     this.trolleyX = Phaser.Math.Clamp(this.trolleyX, this.playLeft, this.playRight);
@@ -162,7 +164,7 @@ export class CraneSystem {
     // Move the static body (kinematic movement)
     this.scene.matter.body.setPosition(this.trolley, {
       x: this.trolleyX,
-      y: CRANE_RAIL_Y,
+      y: TUNING.crane.railY,
     });
     this.scene.matter.body.setVelocity(this.trolley, { x: 0, y: 0 });
 
@@ -184,23 +186,25 @@ export class CraneSystem {
   private draw(): void {
     this.graphics.clear();
 
+    const railY = TUNING.crane.railY;
+
     // Rail
     this.graphics.lineStyle(2, 0x88aaff, 0.8);
     this.graphics.lineBetween(
-      this.playLeft, CRANE_RAIL_Y,
-      this.playRight, CRANE_RAIL_Y,
+      this.playLeft, railY,
+      this.playRight, railY,
     );
 
     // Trolley
     this.graphics.fillStyle(0x88aaff);
-    this.graphics.fillRect(this.trolleyX - 15, CRANE_RAIL_Y - 5, 30, 10);
+    this.graphics.fillRect(this.trolleyX - 15, railY - 5, 30, 10);
 
     // Rope (line from trolley to attached piece)
     if (this.attachedBody) {
       this.graphics.lineStyle(2, 0xcccccc, 0.6);
       this.graphics.lineBetween(
         this.trolleyX,
-        CRANE_RAIL_Y,
+        railY,
         this.attachedBody.position.x,
         this.attachedBody.position.y,
       );

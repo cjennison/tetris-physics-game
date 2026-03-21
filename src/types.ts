@@ -51,6 +51,29 @@ export interface PieceDefinition {
   color: number;
 }
 
+/**
+ * Material properties — affects how a piece behaves physically.
+ *
+ * LEARN: In real physics, material determines density, friction, and bounciness.
+ * In TRASH, materials also affect the crane rope behavior. A heavy lead piece
+ * barely swings because the rope is stiffer and more damped. A light aluminum
+ * piece swings wildly. This adds a layer of strategy — you need different
+ * timing for different materials.
+ */
+export interface MaterialDefinition {
+  label: string;
+  density: number;
+  restitution: number;
+  friction: number;
+  frictionStatic: number;
+  /** Overrides crane rope stiffness for this material */
+  ropeStiffness: number;
+  /** Overrides crane rope damping for this material */
+  ropeDamping: number;
+  /** Display weight (1-10 scale, for UI) */
+  weight: number;
+}
+
 /** Collision categories — bit flags for Matter.js filtering */
 export const CollisionCategory = {
   WALL:   0x0001,

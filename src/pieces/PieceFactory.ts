@@ -1,5 +1,5 @@
 /**
- * PieceFactory — Creates physics bodies and graphics from piece definitions
+ * PieceFactory — Creates physics bodies from piece definitions + materials
  *
  * LEARN: A "factory" in game dev is a function or class that creates game
  * objects. Instead of constructing pieces inline, we centralize creation here.
@@ -7,14 +7,15 @@
  * collision filters, graphics) and makes it easy to change how pieces are
  * built without touching every place that spawns one.
  *
- * Matter.js creates bodies from vertex arrays. For concave shapes (like T
- * and L blocks), it auto-decomposes them into convex sub-parts internally.
- * We store the original vertices on the body for rendering and future slicing.
+ * Each piece gets a random MATERIAL from tuning.json that determines its
+ * physics properties (density, friction, bounciness) and how it behaves
+ * on the crane (rope stiffness/damping). Heavy materials like lead barely
+ * swing, while light ones like aluminum arc wildly.
  */
 import Phaser from 'phaser';
-import { PieceDefinition, CollisionCategory } from '../types';
-import { PIECE_SCALE } from '../config';
+import { PieceDefinition, MaterialDefinition, CollisionCategory } from '../types';
 import { PIECE_DEFINITIONS } from './PieceDefinitions';
+import { TUNING, rollMaterial } from '../tuning';
 
 /** Data we attach to each piece body for later use */
 export interface PieceUserData {
@@ -22,6 +23,18 @@ export interface PieceUserData {
   color: number;
   originalVertices: number[];
   settled: boolean;
+  /** Material key (e.g., "aluminum", "steel", "lead") */
+  materialKey: string;
+  /** Full material properties — used by CraneSystem for rope tuning */
+  material: MaterialDefinition;
+}
+
+/** Result of creating a piece — includes the body and its material info */
+export interface SpawnedPiece {
+  body: MatterJS.BodyType;
+  definition: PieceDefinition;
+  materialKey: string;
+  material: MaterialDefinition;
 }
 
 export class PieceFactory {
@@ -57,62 +70,78 @@ export class PieceFactory {
   }
 
   /**
-   * Create a Matter.js body from a piece definition.
-   *
-   * LEARN: Matter.Bodies.fromVertices() takes an array of {x, y} points
-   * and creates a rigid body. If the shape is concave, Matter auto-splits
-   * it into convex sub-bodies (compound body). The body's position is its
-   * center of mass, not the first vertex.
-   *
-   * We scale the vertices by PIECE_SCALE to convert from our small
-   * definition coordinates (like [-2, -0.5, 2, -0.5, ...]) to actual
-   * pixel sizes on screen.
+   * Create a full piece: picks a random material, creates the physics body,
+   * and returns everything the game needs.
    */
-  createBody(
+  spawnPiece(x: number, y: number): SpawnedPiece {
+    const def = this.nextDefinition();
+    const { key: materialKey, material } = rollMaterial();
+    const body = this.createBody(def, material, materialKey, x, y);
+    return { body, definition: def, materialKey, material };
+  }
+
+  /**
+   * Create a Matter.js body from a piece definition + material.
+   *
+   * LEARN: The material determines the physics "feel":
+   * - density: How heavy (affects inertia, which affects swing amplitude)
+   * - restitution: Bounciness on collision (rubber bounces, lead doesn't)
+   * - friction: How much pieces grip each other and walls
+   * - frictionStatic: Grip when not moving (prevents slow sliding)
+   *
+   * These come from tuning.json, so you can adjust the feel of each
+   * material without touching code.
+   */
+  private createBody(
     def: PieceDefinition,
+    material: MaterialDefinition,
+    materialKey: string,
     x: number,
     y: number,
   ): MatterJS.BodyType {
+    const scale = TUNING.pieces.scale;
+
     // Convert flat vertex array to Phaser-style {x, y} points
     const points: Phaser.Types.Math.Vector2Like[] = [];
     for (let i = 0; i < def.vertices.length; i += 2) {
       points.push({
-        x: def.vertices[i] * PIECE_SCALE,
-        y: def.vertices[i + 1] * PIECE_SCALE,
+        x: def.vertices[i] * scale,
+        y: def.vertices[i + 1] * scale,
       });
     }
 
-    // Create the physics body from vertices
     const body = this.scene.matter.add.fromVertices(
       x,
       y,
       [points],
       {
         label: `piece-${def.name}`,
-        restitution: 0.1,   // Low bounce — pieces shouldn't be super bouncy
-        friction: 0.6,       // Moderate friction so pieces grip each other
-        frictionStatic: 0.8, // Higher static friction prevents sliding
-        density: 0.002,      // Moderate density
+        restitution: material.restitution,
+        friction: material.friction,
+        frictionStatic: material.frictionStatic,
+        density: material.density,
         collisionFilter: {
           category: CollisionCategory.PIECE,
           mask: CollisionCategory.WALL | CollisionCategory.PIECE,
         },
       },
-      true, // Remove collinear points for cleaner geometry
+      true,
     );
 
     /**
-     * LEARN: "User data" (or "plugin data" in Matter.js) is a way to attach
-     * custom information to a physics body. The physics engine ignores it,
-     * but our game code can read it. We store the piece name, color, and
-     * original vertices here so the rendering system and future slicing
-     * system can access them without a separate lookup table.
+     * LEARN: We attach the material data directly to the body so other
+     * systems (CraneSystem, PieceRenderer) can read it without needing
+     * a lookup table. When the crane attaches this piece, it reads
+     * material.ropeStiffness and material.ropeDamping to configure
+     * the rope constraint — making heavy pieces swing less.
      */
     (body as MatterJS.BodyType & { gameData: PieceUserData }).gameData = {
       name: def.name,
       color: def.color,
       originalVertices: def.vertices,
       settled: false,
+      materialKey,
+      material,
     };
 
     return body;
