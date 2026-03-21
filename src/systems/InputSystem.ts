@@ -19,6 +19,7 @@ import { WALL_THICKNESS } from '../config';
 export class InputSystem {
   private scene: Phaser.Scene;
   private boardWidth: number;
+  private originX: number;
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
   private spaceKey: Phaser.Input.Keyboard.Key | null = null;
   private touchTargetX: number | null = null;
@@ -27,13 +28,13 @@ export class InputSystem {
   /**
    * LEARN: The crane position is tracked as a normalized value (0-1).
    * 0 = left wall, 1 = right wall. This makes it independent of board size.
-   * When the board is resized, the crane stays in the same relative position.
    */
-  private currentTarget = 0.5; // Start centered
+  private currentTarget = 0.5;
 
-  constructor(scene: Phaser.Scene, boardWidth: number) {
+  constructor(scene: Phaser.Scene, boardWidth: number, originX = 0) {
     this.scene = scene;
     this.boardWidth = boardWidth;
+    this.originX = originX;
     this.setupKeyboard();
     this.setupTouch();
   }
@@ -70,8 +71,8 @@ export class InputSystem {
    * For mobile: dragging moves the crane, tapping drops the piece.
    */
   private setupTouch(): void {
-    const playLeft = WALL_THICKNESS;
-    const playRight = this.boardWidth - WALL_THICKNESS;
+    const playLeft = this.originX + WALL_THICKNESS;
+    const playRight = this.originX + this.boardWidth - WALL_THICKNESS;
     const playWidth = playRight - playLeft;
 
     this.scene.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {

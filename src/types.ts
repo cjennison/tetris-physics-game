@@ -34,10 +34,11 @@ export interface BoardConfig {
 
 /** The state machine for a single game board */
 export type GameState =
-  | 'spawning'    // Creating next piece on crane
+  | 'waiting'     // Waiting for a piece to be delivered
+  | 'spawning'    // Legacy — treated as waiting
   | 'swinging'    // Player controlling crane, piece swinging
   | 'dropping'    // Piece released, falling
-  | 'settling'    // Waiting for piece to come to rest
+  | 'settling'    // Legacy — not used (1s timer instead)
   | 'laser_check' // Checking laser coverage
   | 'game_over';  // Pile reached crane height
 

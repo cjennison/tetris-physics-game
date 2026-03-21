@@ -51,17 +51,19 @@ export class CraneSystem {
   /** Graphics for rendering the crane visuals */
   private graphics: Phaser.GameObjects.Graphics;
 
-  /** Play area bounds */
+  /** Play area bounds (absolute landscape coordinates) */
   private playLeft: number;
   private playRight: number;
+  private originY: number;
 
-  constructor(scene: Phaser.Scene, boardWidth: number) {
+  constructor(scene: Phaser.Scene, boardWidth: number, originX = 0, originY = 0) {
     this.scene = scene;
-    this.playLeft = WALL_THICKNESS;
-    this.playRight = boardWidth - WALL_THICKNESS;
-    this.trolleyX = boardWidth / 2;
+    this.originY = originY;
+    this.playLeft = originX + WALL_THICKNESS;
+    this.playRight = originX + boardWidth - WALL_THICKNESS;
+    this.trolleyX = originX + boardWidth / 2;
 
-    const railY = TUNING.crane.railY;
+    const railY = originY + TUNING.crane.railY;
     const ropeLength = TUNING.crane.ropeLength;
 
     // Create the trolley body — static, moves by code
@@ -202,7 +204,7 @@ export class CraneSystem {
     // Move the static trolley
     this.scene.matter.body.setPosition(this.trolley, {
       x: this.trolleyX,
-      y: TUNING.crane.railY,
+      y: this.originY + TUNING.crane.railY,
     });
     this.scene.matter.body.setVelocity(this.trolley, { x: 0, y: 0 });
 
@@ -282,7 +284,7 @@ export class CraneSystem {
   private draw(): void {
     this.graphics.clear();
 
-    const railY = TUNING.crane.railY;
+    const railY = this.originY + TUNING.crane.railY;
 
     // Rail
     this.graphics.lineStyle(2, 0x88aaff, 0.8);

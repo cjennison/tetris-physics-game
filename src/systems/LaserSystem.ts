@@ -63,20 +63,22 @@ export class LaserSystem {
     boardWidth: number,
     boardHeight: number,
     laserCount: number,
+    originX = 0,
+    originY = 0,
   ) {
     this.scene = scene;
     this.renderer = renderer;
     this.eventBus = eventBus;
-    this.playLeft = WALL_THICKNESS;
-    this.playRight = boardWidth - WALL_THICKNESS;
+    this.playLeft = originX + WALL_THICKNESS;
+    this.playRight = originX + boardWidth - WALL_THICKNESS;
     this.playWidth = this.playRight - this.playLeft;
 
     this.graphics = scene.add.graphics();
-    this.graphics.setDepth(3); // Between walls (0) and pieces (5)
+    this.graphics.setDepth(3);
 
     // Create laser lines evenly spaced across the play area
-    const railY = TUNING.crane.railY;
-    const floorY = boardHeight - WALL_THICKNESS;
+    const railY = originY + TUNING.crane.railY;
+    const floorY = originY + boardHeight - WALL_THICKNESS;
     const playHeight = floorY - railY;
     const spacing = playHeight / (laserCount + 1);
 
