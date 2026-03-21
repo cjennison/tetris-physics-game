@@ -29,44 +29,44 @@ Phases are sequential — each builds on the previous. Within a phase, tasks can
 
 ---
 
-## Phase 2: Crane System `[ ]`
+## Phase 2: Crane System `[x]`
 
 **Goal**: Moveable crane with rope constraint. Attach a simple square piece. Get the pendulum swing feeling right.
 
 **Key Concepts**: Kinematic bodies, constraints, pendulum physics, lerp smoothing, input mapping
 
 **Tasks**:
-- [ ] Create `CraneSystem` — trolley (static body) moves on rail
-- [ ] Create `Rope` — Matter.Constraint between trolley and piece
-- [ ] Create `InputSystem` — arrow keys / touch → `GameActions`
-- [ ] Wire input to crane movement with lerp smoothing
-- [ ] Spawn a test square piece attached to crane rope
-- [ ] Space bar detaches constraint (piece falls with swing velocity)
-- [ ] Tune: rope length, stiffness, damping until swing feels good
-- [ ] Mobile: touch left/right halves to move, tap center to drop
+- [x] Create `CraneSystem` — trolley (static body) moves on rail
+- [x] Create `Rope` — Matter.Constraint between trolley and piece
+- [x] Create `InputSystem` — arrow keys / touch → `GameActions`
+- [x] Wire input to crane movement with lerp smoothing
+- [x] Spawn a test square piece attached to crane rope
+- [x] Space bar detaches constraint (piece falls with swing velocity)
+- [x] Tune: rope length, stiffness, damping until swing feels good
+- [x] Mobile: touch left/right halves to move, tap center to drop
 
 **Acceptance Criteria**:
-- [ ] Crane trolley moves smoothly left/right
-- [ ] Piece swings like a pendulum when crane moves
-- [ ] Dropping preserves swing momentum
-- [ ] Piece collides with walls and floor
-- [ ] Works with keyboard AND touch input
-- [ ] No physics glitches (piece doesn't fly through walls)
+- [x] Crane trolley moves smoothly left/right
+- [x] Piece swings like a pendulum when crane moves
+- [x] Dropping preserves swing momentum
+- [x] Piece collides with walls and floor
+- [x] Works with keyboard AND touch input
+- [x] No physics glitches (piece doesn't fly through walls)
 
 ---
 
-## Phase 3: Piece System `[ ]`
+## Phase 3: Piece System `[~]`
 
 **Goal**: All 7 piece shapes, random spawning, piece queue with next-piece preview.
 
 **Key Concepts**: Polygon bodies, fromVertices(), convex decomposition, piece bag randomization
 
 **Tasks**:
-- [ ] Create `PieceFactory` — generates Matter bodies from `PieceDefinitions`
-- [ ] Create `Piece` entity — wraps Matter body + Phaser graphics
-- [ ] Render pieces with correct colors from vertex data
-- [ ] Implement piece bag randomizer (Tetris-style: shuffle bag of 7, deal one at a time)
-- [ ] Auto-spawn next piece on crane after drop
+- [x] Create `PieceFactory` — generates Matter bodies from `PieceDefinitions`
+- [x] Create `Piece` entity — wraps Matter body + Phaser graphics (via PieceRenderer)
+- [x] Render pieces with correct colors from vertex data
+- [x] Implement piece bag randomizer (Tetris-style: shuffle bag of 7, deal one at a time)
+- [x] Auto-spawn next piece on crane after drop
 - [ ] Show "next piece" preview in corner of board
 - [ ] Add `poly-decomp` for concave shape support
 
@@ -79,16 +79,16 @@ Phases are sequential — each builds on the previous. Within a phase, tasks can
 
 ---
 
-## Phase 4: Settling Detection `[ ]`
+## Phase 4: Settling Detection `[~]`
 
 **Goal**: Detect when a dropped piece has stopped moving. Transition state machine correctly.
 
 **Key Concepts**: Velocity thresholds, frame counting, state machines in games
 
 **Tasks**:
-- [ ] Track velocity of active piece after drop
-- [ ] Implement settling check: velocity < threshold for N consecutive frames
-- [ ] State machine transitions: DROPPING → SETTLING → (next state)
+- [x] Track velocity of active piece after drop
+- [x] Implement settling check: velocity < threshold for N consecutive frames
+- [x] State machine transitions: DROPPING → SETTLING → (next state)
 - [ ] Visual indicator when piece is "settling" (brief flash or opacity change)
 - [ ] Handle edge case: piece bounces off and never settles (timeout → force settle)
 
