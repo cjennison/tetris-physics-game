@@ -123,7 +123,7 @@ export const concreteCollisionHandler: MaterialCollisionHandler = (
           slop: 0.1,
           collisionFilter: {
             category: CollisionCategory.PIECE,
-            mask: CollisionCategory.WALL | CollisionCategory.PIECE | 0x0008,
+            mask: CollisionCategory.WALL | CollisionCategory.PIECE | 0x0008 | 0x0010,
           },
         },
         true,
