@@ -18,8 +18,15 @@
 import Phaser from 'phaser';
 import { TUNING } from '../tuning';
 import { WALL_THICKNESS } from '../config';
+import { CollisionCategory } from '../types';
+import { getPieceData, type PieceUserData } from '../pieces/PieceFactory';
 import { PieceRenderer } from './PieceRenderer';
 import { EventBus } from '../core/EventBus';
+import {
+  splitPolygon,
+  polygonArea,
+  polygonCentroid,
+} from '../utils/PolygonUtils';
 
 interface LaserLine {
   /** Y position of the laser center */
@@ -156,46 +163,139 @@ export class LaserSystem {
   }
 
   /**
-   * Fire a laser — destroy all piece material within the band.
+   * Fire a laser — slice pieces at band boundaries, destroy the insides.
    *
-   * LEARN: When a laser fires, we remove every piece body that overlaps
-   * the band. In a future phase (Phase 6), we'll slice pieces at the
-   * band boundaries so only the portion INSIDE the band is destroyed.
-   * For now, any piece touching the band is fully removed — simpler
-   * but still satisfying. The pieces above collapse under gravity.
+   * LEARN: This is the core Tetris-but-physics mechanic. Instead of
+   * removing whole pieces, we SLICE each sub-part at the band's top
+   * and bottom edges. Portions INSIDE the band are destroyed. Portions
+   * ABOVE and BELOW survive as new independent bodies that fall under
+   * gravity. This means a tall L-Block spanning the laser gets cut
+   * into an upper and lower fragment, with the middle vaporized.
+   *
+   * The algorithm per sub-part:
+   * 1. Split polygon at bandTop (horizontal line) → upper half, lower half
+   * 2. Split the lower half at bandBottom → middle slice, bottom piece
+   * 3. Keep upper + bottom pieces, destroy middle
+   * 4. Create new Matter bodies for survivors
    */
   private fireLaser(
-    laser: LaserLine,
+    _laser: LaserLine,
     bodies: MatterJS.BodyType[],
     bandTop: number,
     bandBottom: number,
   ): void {
-    // Find all bodies overlapping this band
-    const victims = bodies.filter(b =>
-      b.bounds.max.y > bandTop && b.bounds.min.y < bandBottom,
-    );
+    const MIN_FRAGMENT_AREA = 80;
 
-    // For each victim, check if it's substantially within the band
-    // (at least 30% of its height inside the band = gets destroyed)
-    for (const body of victims) {
-      const bodyTop = body.bounds.min.y;
-      const bodyBottom = body.bounds.max.y;
-      const bodyHeight = bodyBottom - bodyTop;
-      const overlapTop = Math.max(bodyTop, bandTop);
-      const overlapBottom = Math.min(bodyBottom, bandBottom);
-      const overlapHeight = Math.max(0, overlapBottom - overlapTop);
-      const overlapRatio = overlapHeight / Math.max(bodyHeight, 1);
+    // Collect all parent bodies that overlap the band
+    const processed = new Set<number>();
+    const victims: MatterJS.BodyType[] = [];
 
-      if (overlapRatio > 0.3) {
-        // Resolve to parent for compound bodies
-        const parent = (body as MatterJS.BodyType & { parent?: MatterJS.BodyType }).parent ?? body;
-        this.renderer.removeBody(parent);
-        this.scene.matter.world.remove(parent);
+    for (const body of bodies) {
+      const parent = (body as MatterJS.BodyType & { parent?: MatterJS.BodyType }).parent ?? body;
+      if (processed.has(parent.id)) continue;
+      if (parent.bounds.max.y > bandTop && parent.bounds.min.y < bandBottom) {
+        victims.push(parent);
+        processed.add(parent.id);
       }
     }
 
-    this.eventBus.emit(EventBus.LASER_FIRED, { y: laser.y });
-    this.eventBus.emit(EventBus.LINE_CLEARED, { y: laser.y });
+    for (const parent of victims) {
+      const data = getPieceData(parent);
+      if (!data) continue;
+
+      // Check if fully inside band — just destroy entirely
+      if (parent.bounds.min.y >= bandTop && parent.bounds.max.y <= bandBottom) {
+        this.renderer.removeBody(parent);
+        this.scene.matter.world.remove(parent);
+        continue;
+      }
+
+      // Get sub-parts (or the body itself if simple)
+      const parts = parent.parts.length > 1
+        ? parent.parts.slice(1)
+        : [parent];
+
+      const survivors: Array<{ verts: Array<{ x: number; y: number }>; center: { x: number; y: number } }> = [];
+
+      for (const part of parts) {
+        if (!part.vertices || part.vertices.length < 3) continue;
+        const verts = part.vertices.map((v: { x: number; y: number }) => ({ x: v.x, y: v.y }));
+
+        // Split at bandTop — horizontal line, normal pointing down (0, 1)
+        const [above, below] = splitPolygon(verts, { x: 0, y: bandTop }, 0, 1);
+
+        // Keep anything fully above the band
+        if (above.length >= 3 && polygonArea(above) >= MIN_FRAGMENT_AREA) {
+          survivors.push({ verts: above, center: polygonCentroid(above) });
+        }
+
+        // Split the below portion at bandBottom
+        if (below.length >= 3) {
+          const [middle, bottom] = splitPolygon(below, { x: 0, y: bandBottom }, 0, 1);
+          // middle = inside band = destroyed (we just don't keep it)
+          void middle;
+
+          // Keep anything below the band
+          if (bottom.length >= 3 && polygonArea(bottom) >= MIN_FRAGMENT_AREA) {
+            survivors.push({ verts: bottom, center: polygonCentroid(bottom) });
+          }
+        }
+      }
+
+      // Remove original body
+      this.renderer.removeBody(parent);
+      this.scene.matter.world.remove(parent);
+
+      // Create new bodies for surviving fragments
+      for (const frag of survivors) {
+        const localVerts = frag.verts.map(v => ({
+          x: v.x - frag.center.x,
+          y: v.y - frag.center.y,
+        }));
+
+        try {
+          const fragBody = this.scene.matter.add.fromVertices(
+            frag.center.x,
+            frag.center.y,
+            [localVerts],
+            {
+              label: `piece-${data.name}-sliced`,
+              restitution: data.material.restitution,
+              friction: data.material.friction,
+              frictionStatic: data.material.frictionStatic,
+              frictionAir: data.material.frictionAir ?? 0.01,
+              density: data.material.density,
+              collisionFilter: {
+                category: CollisionCategory.PIECE,
+                mask: CollisionCategory.WALL | CollisionCategory.PIECE,
+              },
+            },
+            true,
+          );
+
+          // Copy game data to fragment
+          (fragBody as MatterJS.BodyType & { gameData: PieceUserData }).gameData = {
+            ...data,
+            name: `${data.name}-sliced`,
+            settled: false,
+            createdAt: Date.now(),
+          };
+
+          // Inherit parent velocity
+          this.scene.matter.body.setVelocity(fragBody, {
+            x: parent.velocity.x * 0.3,
+            y: parent.velocity.y * 0.3,
+          });
+
+          this.renderer.addBody(fragBody);
+        } catch {
+          // Skip degenerate fragments
+        }
+      }
+    }
+
+    this.eventBus.emit(EventBus.LASER_FIRED, { y: _laser.y });
+    this.eventBus.emit(EventBus.LINE_CLEARED, { y: _laser.y });
   }
 
   /** Draw laser lines with coverage and state visualization */
