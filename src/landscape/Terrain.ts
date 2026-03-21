@@ -1,14 +1,17 @@
 /**
  * Terrain — Hilly dump landscape
  *
- * LEARN: The terrain uses Bodies.fromVertices for each section — one
- * left of the column gap, one right. Each body is a polygon that traces
- * the terrain surface on top and extends deep below. This guarantees
- * the physics surface matches the visual surface exactly.
+ * LEARN: After multiple failed approaches (rotated rectangles, fromVertices
+ * with centroid correction), the most reliable method is the simplest:
+ * use Phaser's built-in matter.add.fromPhysicsEditor-style approach with
+ * many small FLAT static rectangles stacked like stairs to approximate
+ * the terrain slope. Each rectangle is axis-aligned (no rotation) and
+ * positioned at exact coordinates. Boring but bulletproof.
  *
- * The trick: fromVertices shifts bodies to their centroid, so we
- * create the body, check where Matter placed it, then reposition
- * it to where we actually want it.
+ * We sample the terrain curve at 10px intervals and place a thin
+ * rectangle at each sample point. The visual is drawn with the smooth
+ * curve, while physics uses the staircase approximation (invisible at
+ * 10px resolution).
  */
 import Phaser from 'phaser';
 import { LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT } from '../config';
@@ -40,78 +43,51 @@ export class Terrain {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.createTerrainBodies();
+    this.createPhysicsStaircase();
     this.draw();
   }
 
-  private createTerrainBodies(): void {
-    const collisionFilter = { category: 0x0001, mask: 0x0002 | 0x0010 };
-    const bottom = LANDSCAPE_HEIGHT + 100;
-
-    // Split terrain points into left-of-gap and right-of-gap
-    const leftPoints = TERRAIN_POINTS.filter(p => p.x <= COLUMN_GAP_LEFT);
-    const rightPoints = TERRAIN_POINTS.filter(p => p.x >= COLUMN_GAP_RIGHT);
-
-    if (leftPoints.length >= 2) {
-      this.createSection(leftPoints, bottom, collisionFilter);
-    }
-    if (rightPoints.length >= 2) {
-      this.createSection(rightPoints, bottom, collisionFilter);
-    }
-  }
-
   /**
-   * Create a terrain section from surface points.
-   *
-   * LEARN: We build a polygon: surface points left→right, then bottom
-   * edge right→left. fromVertices() shifts the body to its centroid,
-   * so we compute where we WANT the centroid to be, create the body,
-   * then correct the position offset.
+   * Create terrain as a dense staircase of flat rectangles.
+   * Each rectangle is 10px wide, positioned at the terrain height.
+   * No rotation — just axis-aligned boxes. Simple and reliable.
    */
-  private createSection(
-    points: Array<{ x: number; y: number }>,
-    bottom: number,
-    collisionFilter: { category: number; mask: number },
-  ): void {
-    // Build closed polygon vertices
-    const verts: Array<{ x: number; y: number }> = [];
-    for (const p of points) verts.push({ x: p.x, y: p.y });
-    verts.push({ x: points[points.length - 1]!.x, y: bottom });
-    verts.push({ x: points[0]!.x, y: bottom });
+  private createPhysicsStaircase(): void {
+    const collisionFilter = { category: 0x0001, mask: 0x0002 | 0x0010 };
+    const step = 10; // Sample every 10px
+    const depth = 300; // How deep each block extends below the surface
 
-    // Compute the centroid of our desired polygon
-    let cx = 0, cy = 0;
-    for (const v of verts) { cx += v.x; cy += v.y; }
-    cx /= verts.length;
-    cy /= verts.length;
+    for (let x = 0; x < LANDSCAPE_WIDTH; x += step) {
+      // Skip the column gap
+      if (x >= COLUMN_GAP_LEFT && x < COLUMN_GAP_RIGHT) continue;
 
-    // Convert to local coords for fromVertices
-    const localVerts = verts.map(v => ({ x: v.x - cx, y: v.y - cy }));
+      const surfaceY = Terrain.getHeightAt(x + step / 2);
 
-    const body = this.scene.matter.add.fromVertices(
-      cx, cy, [localVerts],
-      {
-        isStatic: true,
-        label: 'terrain',
-        friction: 0.8,
-        collisionFilter,
-      },
-      true,
-    );
-
-    // fromVertices places the body at the centroid of the DECOMPOSED shape,
-    // which may differ from our computed centroid. Correct the offset.
-    const actualX = body.position.x;
-    const actualY = body.position.y;
-    const offsetX = cx - actualX;
-    const offsetY = cy - actualY;
-
-    if (Math.abs(offsetX) > 1 || Math.abs(offsetY) > 1) {
-      this.scene.matter.body.setPosition(body, {
-        x: actualX + offsetX,
-        y: actualY + offsetY,
-      });
+      this.scene.matter.add.rectangle(
+        x + step / 2,           // Center X
+        surfaceY + depth / 2,   // Center Y (surface + half depth)
+        step + 1,               // Width (+1 for overlap, no gaps)
+        depth,                  // Height
+        {
+          isStatic: true,
+          label: 'terrain',
+          friction: 0.8,
+          collisionFilter,
+        },
+      );
     }
+
+    // Bridge over column gap (vehicle only)
+    const bridgeWidth = COLUMN_GAP_RIGHT - COLUMN_GAP_LEFT + 20;
+    this.scene.matter.add.rectangle(
+      (COLUMN_GAP_LEFT + COLUMN_GAP_RIGHT) / 2,
+      COLUMN_GROUND_Y + 5,
+      bridgeWidth, 15,
+      {
+        isStatic: true, label: 'column-bridge', friction: 0.8,
+        collisionFilter: { category: 0x0020, mask: 0x0010 },
+      },
+    );
   }
 
   private draw(): void {
@@ -146,6 +122,7 @@ export class Terrain {
     g.setDepth(-1);
   }
 
+  /** Get terrain height at a given X by interpolating between points */
   static getHeightAt(x: number): number {
     for (let i = 0; i < TERRAIN_POINTS.length - 1; i++) {
       const a = TERRAIN_POINTS[i]!;
