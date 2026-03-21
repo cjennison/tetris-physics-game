@@ -1,15 +1,15 @@
 /**
- * TouchControls — On-screen virtual buttons for mobile crane operation
+ * TouchControls — Landscape-optimized virtual controls
  *
- * LEARN: Mobile games need virtual controls since there's no keyboard.
- * We create DOM buttons overlaid on the game canvas. DOM buttons are
- * easier to style and more reliable for touch than Phaser game objects
- * (no issues with camera zoom/scroll affecting touch coordinates).
+ * Layout for landscape phone (held sideways):
  *
- * Layout:
- *   Left side: Drive buttons (← →)
- *   Right side: Boom buttons (↑ ↓) and Rope buttons (reel ↑↓)
- *   Center bottom: GRAB/DROP button
+ *   LEFT SIDE (D-pad):          RIGHT SIDE:
+ *        [BOOM ▲]               [ROPE ▲]
+ *   [◀]          [▶]           [GRAB/DROP]
+ *        [BOOM ▼]               [ROPE ▼]
+ *
+ * Left D-pad: drive left/right + boom up/down
+ * Right side: rope in/out + grab/drop button
  */
 
 export interface TouchState {
@@ -19,7 +19,7 @@ export interface TouchState {
   boomDown: boolean;
   ropeIn: boolean;
   ropeOut: boolean;
-  grab: boolean; // one-shot
+  grab: boolean;
 }
 
 export class TouchControls {
@@ -31,7 +31,6 @@ export class TouchControls {
     grab: false,
   };
 
-  /** Only show on touch devices */
   private isTouchDevice: boolean;
 
   constructor() {
@@ -44,10 +43,9 @@ export class TouchControls {
     }
   }
 
-  /** Read and reset one-shot inputs */
   getState(): TouchState {
     const s = { ...this.state };
-    this.state.grab = false; // Reset one-shot
+    this.state.grab = false;
     return s;
   }
 
@@ -55,112 +53,106 @@ export class TouchControls {
     const container = document.createElement('div');
     container.id = 'touch-controls';
     container.style.cssText = `
-      position: fixed; bottom: 0; left: 0; right: 0;
-      height: 140px; z-index: 9998;
-      display: flex; justify-content: space-between; align-items: flex-end;
-      padding: 8px 12px; pointer-events: none;
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 9998; pointer-events: none;
       user-select: none; -webkit-user-select: none;
     `;
 
-    // Left side — drive buttons
-    const leftGroup = this.createGroup();
-    leftGroup.appendChild(this.createButton('◀', 'driveLeft', 60, 55));
-    leftGroup.appendChild(this.createButton('▶', 'driveRight', 60, 55));
-    container.appendChild(leftGroup);
+    // Left D-pad — drive + boom
+    const leftPad = document.createElement('div');
+    leftPad.style.cssText = `
+      position: absolute; bottom: 20px; left: 15px;
+      display: grid; grid-template-columns: 55px 55px 55px;
+      grid-template-rows: 55px 55px 55px; gap: 4px;
+      pointer-events: auto;
+    `;
 
-    // Center — grab/drop
-    const centerGroup = this.createGroup();
-    centerGroup.style.alignItems = 'center';
-    const grabBtn = this.createButton('GRAB', 'grab', 80, 50, true);
-    grabBtn.style.background = '#446644';
-    centerGroup.appendChild(grabBtn);
-    container.appendChild(centerGroup);
+    // Row 1: empty, boom up, empty
+    leftPad.appendChild(this.createEmpty());
+    leftPad.appendChild(this.createBtn('▲', 'boomUp', '#4455aa'));
+    leftPad.appendChild(this.createEmpty());
 
-    // Right side — boom and rope
-    const rightGroup = this.createGroup();
-    rightGroup.style.flexDirection = 'column';
-    rightGroup.style.gap = '4px';
+    // Row 2: drive left, center label, drive right
+    leftPad.appendChild(this.createBtn('◀', 'driveLeft', '#556677'));
+    const center = document.createElement('div');
+    center.style.cssText = 'display:flex;align-items:center;justify-content:center;color:#555;font-size:8px;font-family:monospace;';
+    center.textContent = 'D-PAD';
+    leftPad.appendChild(center);
+    leftPad.appendChild(this.createBtn('▶', 'driveRight', '#556677'));
 
-    const boomRow = this.createGroup();
-    boomRow.appendChild(this.createLabel('BOOM'));
-    boomRow.appendChild(this.createButton('▲', 'boomUp', 50, 45));
-    boomRow.appendChild(this.createButton('▼', 'boomDown', 50, 45));
-    rightGroup.appendChild(boomRow);
+    // Row 3: empty, boom down, empty
+    leftPad.appendChild(this.createEmpty());
+    leftPad.appendChild(this.createBtn('▼', 'boomDown', '#4455aa'));
+    leftPad.appendChild(this.createEmpty());
 
-    const ropeRow = this.createGroup();
-    ropeRow.appendChild(this.createLabel('ROPE'));
-    ropeRow.appendChild(this.createButton('▲', 'ropeIn', 50, 45));
-    ropeRow.appendChild(this.createButton('▼', 'ropeOut', 50, 45));
-    rightGroup.appendChild(ropeRow);
+    container.appendChild(leftPad);
 
-    container.appendChild(rightGroup);
+    // Right side — rope + grab
+    const rightPad = document.createElement('div');
+    rightPad.style.cssText = `
+      position: absolute; bottom: 20px; right: 15px;
+      display: flex; flex-direction: column; gap: 6px; align-items: center;
+      pointer-events: auto;
+    `;
+
+    rightPad.appendChild(this.createBtn('REEL ▲', 'ropeIn', '#557755', 70, 48));
+    rightPad.appendChild(this.createBtn('GRAB', 'grab', '#448844', 70, 55, true));
+    rightPad.appendChild(this.createBtn('REEL ▼', 'ropeOut', '#557755', 70, 48));
+
+    container.appendChild(rightPad);
 
     return container;
   }
 
-  private createGroup(): HTMLDivElement {
+  private createEmpty(): HTMLDivElement {
     const div = document.createElement('div');
-    div.style.cssText = 'display: flex; gap: 6px; pointer-events: auto;';
     return div;
   }
 
-  private createLabel(text: string): HTMLSpanElement {
-    const span = document.createElement('span');
-    span.textContent = text;
-    span.style.cssText = `
-      color: #888; font-family: monospace; font-size: 10px;
-      display: flex; align-items: center; width: 35px;
-    `;
-    return span;
-  }
-
-  private createButton(
+  private createBtn(
     label: string,
     stateKey: keyof TouchState,
-    width: number,
-    height: number,
+    bg: string,
+    width = 55,
+    height = 55,
     oneShot = false,
   ): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.textContent = label;
     btn.style.cssText = `
       width: ${width}px; height: ${height}px;
-      background: rgba(80, 80, 100, 0.7);
-      color: #ddd; border: 1px solid rgba(120, 120, 140, 0.5);
-      border-radius: 8px; font-family: monospace; font-size: 16px;
+      background: ${bg}aa; color: #ddd;
+      border: 1px solid ${bg}; border-radius: 10px;
+      font-family: monospace; font-size: ${label.length > 3 ? '11' : '18'}px;
       pointer-events: auto; touch-action: none;
       -webkit-user-select: none; user-select: none;
     `;
 
     if (oneShot) {
-      btn.addEventListener('touchstart', (e) => {
+      const fire = (e: Event) => {
         e.preventDefault();
         this.state[stateKey] = true;
-        btn.style.background = 'rgba(100, 150, 100, 0.8)';
-        setTimeout(() => { btn.style.background = '#446644'; }, 150);
-      });
-      btn.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        this.state[stateKey] = true;
-      });
+        btn.style.opacity = '0.5';
+        setTimeout(() => { btn.style.opacity = '1'; }, 150);
+      };
+      btn.addEventListener('touchstart', fire);
+      btn.addEventListener('mousedown', fire);
     } else {
-      // Held buttons — active while touching
-      const activate = (e: Event) => {
+      const on = (e: Event) => {
         e.preventDefault();
         (this.state as unknown as Record<string, boolean>)[stateKey] = true;
-        btn.style.background = 'rgba(100, 100, 140, 0.9)';
+        btn.style.opacity = '0.6';
       };
-      const deactivate = () => {
+      const off = () => {
         (this.state as unknown as Record<string, boolean>)[stateKey] = false;
-        btn.style.background = 'rgba(80, 80, 100, 0.7)';
+        btn.style.opacity = '1';
       };
-
-      btn.addEventListener('touchstart', activate);
-      btn.addEventListener('touchend', deactivate);
-      btn.addEventListener('touchcancel', deactivate);
-      btn.addEventListener('mousedown', activate);
-      btn.addEventListener('mouseup', deactivate);
-      btn.addEventListener('mouseleave', deactivate);
+      btn.addEventListener('touchstart', on);
+      btn.addEventListener('touchend', off);
+      btn.addEventListener('touchcancel', off);
+      btn.addEventListener('mousedown', on);
+      btn.addEventListener('mouseup', off);
+      btn.addEventListener('mouseleave', off);
     }
 
     return btn;
