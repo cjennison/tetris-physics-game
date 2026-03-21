@@ -15,7 +15,7 @@
 import Phaser from 'phaser';
 import { PieceDefinition, MaterialDefinition, CollisionCategory } from '../types';
 import { PIECE_DEFINITIONS } from './PieceDefinitions';
-import { TUNING, rollMaterial } from '../tuning';
+import { TUNING, rollMaterial, getMaterial } from '../tuning';
 
 /** Data we attach to each piece body for later use */
 export interface PieceUserData {
@@ -49,9 +49,26 @@ export class PieceFactory {
    */
   private bag: PieceDefinition[] = [];
 
+  /** Dev overrides — when set, the next spawn uses these instead of random */
+  private forcedShape: string | null = null;
+  private forcedMaterial: string | null = null;
+
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
   }
+
+  /** Force the next spawned piece to use a specific shape */
+  setForcedShape(shapeName: string | null): void {
+    this.forcedShape = shapeName;
+  }
+
+  /** Force the next spawned piece to use a specific material */
+  setForcedMaterial(materialKey: string | null): void {
+    this.forcedMaterial = materialKey;
+  }
+
+  getForcedShape(): string | null { return this.forcedShape; }
+  getForcedMaterial(): string | null { return this.forcedMaterial; }
 
   /** Get the next piece definition (using bag randomization) */
   nextDefinition(): PieceDefinition {
@@ -71,11 +88,27 @@ export class PieceFactory {
 
   /**
    * Create a full piece: picks a random material, creates the physics body,
-   * and returns everything the game needs.
+   * and returns everything the game needs. Respects dev console overrides.
    */
   spawnPiece(x: number, y: number): SpawnedPiece {
-    const def = this.nextDefinition();
-    const { key: materialKey, material } = rollMaterial();
+    // Use forced shape or random
+    let def: PieceDefinition;
+    if (this.forcedShape) {
+      def = PIECE_DEFINITIONS.find(d => d.name === this.forcedShape) ?? this.nextDefinition();
+    } else {
+      def = this.nextDefinition();
+    }
+
+    // Use forced material or random
+    let materialKey: string;
+    let material: MaterialDefinition;
+    if (this.forcedMaterial) {
+      materialKey = this.forcedMaterial;
+      material = getMaterial(this.forcedMaterial);
+    } else {
+      ({ key: materialKey, material } = rollMaterial());
+    }
+
     const body = this.createBody(def, material, materialKey, x, y);
     return { body, definition: def, materialKey, material };
   }

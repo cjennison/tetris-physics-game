@@ -31,14 +31,16 @@ import { TUNING } from '../../tuning';
 function getGlassConfig() {
   const glass = TUNING.materials.glass as Record<string, unknown>;
   return {
-    /** Minimum impact force to trigger shatter */
-    shatterThreshold: (glass?.shatterThreshold as number) ?? 1.5,
+    /** Minimum speed to trigger shatter (ignores gentle contacts) */
+    shatterSpeedThreshold: (glass?.shatterSpeedThreshold as number) ?? 2.0,
     /** Number of fracture lines to cast */
     fractureCuts: (glass?.fractureCuts as number) ?? 3,
     /** How fast fragments scatter outward */
     scatterForce: (glass?.scatterForce as number) ?? 2.0,
     /** Minimum fragment area (discard tiny shards) */
     minShardArea: (glass?.minShardArea as number) ?? 150,
+    /** Below this area, glass can no longer shatter further */
+    unbreakableArea: (glass?.unbreakableArea as number) ?? 600,
   };
 }
 
@@ -53,18 +55,30 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
 ): MatterJS.BodyType[] => {
   const config = getGlassConfig();
 
-  // Only shatter on hard enough impacts
-  if (info.impactForce < config.shatterThreshold) {
+  /**
+   * LEARN: We check the RELATIVE speed between the two colliding bodies.
+   * This handles both cases:
+   * - Glass piece dropped onto floor (glass is moving fast)
+   * - Another piece dropped onto a stationary glass shard (other body moving)
+   *
+   * Without checking both, a settled glass shard would never break when
+   * hit by a falling piece, because the shard's own velocity is ~0.
+   */
+  const velA = info.body.velocity;
+  const velB = info.otherBody.velocity;
+  const relVx = velA.x - velB.x;
+  const relVy = velA.y - velB.y;
+  const relativeSpeed = Math.sqrt(relVx * relVx + relVy * relVy);
+  if (relativeSpeed < config.shatterSpeedThreshold) {
     return [];
   }
 
-  /**
-   * LEARN: We get the piece's current world-space vertices from the
-   * Matter.js body. For compound bodies (concave shapes decomposed into
-   * convex parts), we take the vertices of the parent body (parts[0]).
-   * These represent the actual polygon shape in world coordinates,
-   * accounting for position and rotation.
-   */
+  // Check if the piece is too small to shatter further
+  const bodyArea = estimateBodyArea(info.body);
+  if (bodyArea < config.unbreakableArea) {
+    return [];
+  }
+
   const bodyParts = info.body.parts.length > 1
     ? info.body.parts.slice(1)
     : [info.body];
@@ -307,4 +321,10 @@ function polygonCentroid(verts: Array<{ x: number; y: number }>): { x: number; y
     cy += v.y;
   }
   return { x: cx / verts.length, y: cy / verts.length };
+}
+
+/** Estimate area of a Matter.js body from its bounding box */
+function estimateBodyArea(body: MatterJS.BodyType): number {
+  const bounds = body.bounds;
+  return (bounds.max.x - bounds.min.x) * (bounds.max.y - bounds.min.y);
 }

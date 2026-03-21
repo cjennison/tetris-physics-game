@@ -29,6 +29,7 @@ import { PieceRenderer } from '../systems/PieceRenderer';
 import { SpecialMaterialSystem } from '../systems/SpecialMaterialSystem';
 import { glassCollisionHandler } from '../systems/handlers/GlassHandler';
 import { PieceFactory, type SpawnedPiece } from '../pieces/PieceFactory';
+import { DevConsole } from '../ui/DevConsole';
 import { TUNING } from '../tuning';
 import {
   WALL_THICKNESS,
@@ -46,6 +47,8 @@ export class GameInstance extends Phaser.Scene {
   private pieceRenderer!: PieceRenderer;
   private pieceFactory!: PieceFactory;
   private specialMaterials!: SpecialMaterialSystem;
+  // Kept alive for DOM side effects (toggle with ` key)
+  private devConsole: DevConsole | undefined;
 
   // Active piece tracking
   private activePiece: SpawnedPiece | null = null;
@@ -108,6 +111,9 @@ export class GameInstance extends Phaser.Scene {
       color: '#666688',
       fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(10);
+
+    // Dev console — toggle with ` key
+    this.devConsole = new DevConsole(this.pieceFactory);
 
     // Material indicator
     this.materialText = this.add.text(this.boardConfig.width / 2, GAME_HEIGHT - 35, '', {
@@ -377,6 +383,7 @@ export class GameInstance extends Phaser.Scene {
 
     // Restart on input
     const restartHandler = () => {
+      this.devConsole?.destroy();
       this.scene.restart();
     };
     this.input.keyboard?.once('keydown-SPACE', restartHandler);

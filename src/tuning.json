@@ -119,10 +119,11 @@
       "ropeDamping": 0.004,
       "weight": 4,
       "special": "glass",
-      "shatterThreshold": 1.5,
+      "shatterSpeedThreshold": 2.0,
       "fractureCuts": 3,
       "scatterForce": 2.0,
       "minShardArea": 150,
+      "unbreakableArea": 600,
       "_feel": "Medium weight, translucent blue — SHATTERS on impact into random fragments that scatter based on collision angle. Fragile and unpredictable."
     }
   },
