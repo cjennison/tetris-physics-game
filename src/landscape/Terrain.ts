@@ -1,16 +1,18 @@
 /**
  * Terrain — Hilly dump landscape
  *
- * LEARN: The terrain is defined as a series of surface points. For
- * physics, we create a chain of thin static rectangles along each
- * segment of the surface. This is more reliable than fromVertices()
- * which can shift bodies to their center of mass, causing visual
- * mismatch. Each segment is a rotated rectangle matching the slope.
+ * LEARN: The terrain uses Bodies.fromVertices for each section — one
+ * left of the column gap, one right. Each body is a polygon that traces
+ * the terrain surface on top and extends deep below. This guarantees
+ * the physics surface matches the visual surface exactly.
+ *
+ * The trick: fromVertices shifts bodies to their centroid, so we
+ * create the body, check where Matter placed it, then reposition
+ * it to where we actually want it.
  */
 import Phaser from 'phaser';
 import { LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT } from '../config';
 
-/** Terrain surface profile — left to right */
 export const TERRAIN_POINTS: Array<{ x: number; y: number }> = [
   { x: 0,    y: 520 },
   { x: 80,   y: 530 },
@@ -38,83 +40,84 @@ export class Terrain {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.createPhysicsSegments();
+    this.createTerrainBodies();
     this.draw();
   }
 
-  /**
-   * Create terrain as a chain of rotated static rectangles.
-   * Each segment connects two adjacent terrain points.
-   */
-  private createPhysicsSegments(): void {
+  private createTerrainBodies(): void {
     const collisionFilter = { category: 0x0001, mask: 0x0002 | 0x0010 };
-    const thickness = 30;
+    const bottom = LANDSCAPE_HEIGHT + 100;
 
-    /**
-     * LEARN: An invisible bridge spans the column gap. It uses a special
-     * collision category (0x0020) that ONLY the vehicle collides with.
-     * Pieces (category 0x0002) ignore it completely and fall through
-     * into the column. The vehicle drives right over the column opening.
-     */
-    const bridgeCategory = 0x0020; // Vehicle-only bridge
-    const bridgeWidth = COLUMN_GAP_RIGHT - COLUMN_GAP_LEFT + 20; // Slight overlap
-    this.scene.matter.add.rectangle(
-      (COLUMN_GAP_LEFT + COLUMN_GAP_RIGHT) / 2,
-      COLUMN_GROUND_Y + 5, // Just below the surface line
-      bridgeWidth,
-      15, // Thin
-      {
-        isStatic: true,
-        label: 'column-bridge',
-        friction: 0.8,
-        collisionFilter: {
-          category: bridgeCategory,
-          mask: 0x0010, // Only collides with vehicle
-        },
-      },
-    );
+    // Split terrain points into left-of-gap and right-of-gap
+    const leftPoints = TERRAIN_POINTS.filter(p => p.x <= COLUMN_GAP_LEFT);
+    const rightPoints = TERRAIN_POINTS.filter(p => p.x >= COLUMN_GAP_RIGHT);
 
-    for (let i = 0; i < TERRAIN_POINTS.length - 1; i++) {
-      const a = TERRAIN_POINTS[i]!;
-      const b = TERRAIN_POINTS[i + 1]!;
-
-      // Skip the column gap
-      if (a.x <= COLUMN_GAP_LEFT && b.x >= COLUMN_GAP_RIGHT) continue;
-      if (a.x >= COLUMN_GAP_LEFT && a.x < COLUMN_GAP_RIGHT) continue;
-
-      const midX = (a.x + b.x) / 2;
-      const midY = (a.y + b.y) / 2;
-      const dx = b.x - a.x;
-      const dy = b.y - a.y;
-      const length = Math.sqrt(dx * dx + dy * dy);
-      const angle = Math.atan2(dy, dx);
-
-      // Position the rectangle so its TOP surface aligns with the terrain line.
-      // The rectangle center needs to be offset downward by half the thickness,
-      // perpendicular to the segment slope (not just straight down).
-      const perpX = -Math.sin(angle + Math.PI / 2) * (thickness / 2);
-      const perpY = Math.cos(angle + Math.PI / 2) * (thickness / 2);
-      const seg = this.scene.matter.add.rectangle(
-        midX + perpX, midY + perpY,
-        length + 4, thickness,
-        {
-          isStatic: true,
-          angle,
-          label: 'terrain',
-          friction: 0.8,
-          collisionFilter,
-        },
-      );
-      // Prevent rotation (it's static, but just in case)
-      void seg;
+    if (leftPoints.length >= 2) {
+      this.createSection(leftPoints, bottom, collisionFilter);
+    }
+    if (rightPoints.length >= 2) {
+      this.createSection(rightPoints, bottom, collisionFilter);
     }
   }
 
-  /** Draw the terrain — fill and surface line */
+  /**
+   * Create a terrain section from surface points.
+   *
+   * LEARN: We build a polygon: surface points left→right, then bottom
+   * edge right→left. fromVertices() shifts the body to its centroid,
+   * so we compute where we WANT the centroid to be, create the body,
+   * then correct the position offset.
+   */
+  private createSection(
+    points: Array<{ x: number; y: number }>,
+    bottom: number,
+    collisionFilter: { category: number; mask: number },
+  ): void {
+    // Build closed polygon vertices
+    const verts: Array<{ x: number; y: number }> = [];
+    for (const p of points) verts.push({ x: p.x, y: p.y });
+    verts.push({ x: points[points.length - 1]!.x, y: bottom });
+    verts.push({ x: points[0]!.x, y: bottom });
+
+    // Compute the centroid of our desired polygon
+    let cx = 0, cy = 0;
+    for (const v of verts) { cx += v.x; cy += v.y; }
+    cx /= verts.length;
+    cy /= verts.length;
+
+    // Convert to local coords for fromVertices
+    const localVerts = verts.map(v => ({ x: v.x - cx, y: v.y - cy }));
+
+    const body = this.scene.matter.add.fromVertices(
+      cx, cy, [localVerts],
+      {
+        isStatic: true,
+        label: 'terrain',
+        friction: 0.8,
+        collisionFilter,
+      },
+      true,
+    );
+
+    // fromVertices places the body at the centroid of the DECOMPOSED shape,
+    // which may differ from our computed centroid. Correct the offset.
+    const actualX = body.position.x;
+    const actualY = body.position.y;
+    const offsetX = cx - actualX;
+    const offsetY = cy - actualY;
+
+    if (Math.abs(offsetX) > 1 || Math.abs(offsetY) > 1) {
+      this.scene.matter.body.setPosition(body, {
+        x: actualX + offsetX,
+        y: actualY + offsetY,
+      });
+    }
+  }
+
   private draw(): void {
     const g = this.scene.add.graphics();
 
-    // Fill below terrain surface
+    // Fill below terrain
     g.fillStyle(0x2a2a35);
     g.beginPath();
     g.moveTo(TERRAIN_POINTS[0]!.x, TERRAIN_POINTS[0]!.y);
@@ -131,20 +134,18 @@ export class Terrain {
     for (let i = 0; i < TERRAIN_POINTS.length - 1; i++) {
       const a = TERRAIN_POINTS[i]!;
       const b = TERRAIN_POINTS[i + 1]!;
-      // Don't draw across the column gap
       if (a.x <= COLUMN_GAP_LEFT && b.x >= COLUMN_GAP_RIGHT) continue;
       g.lineBetween(a.x, a.y, b.x, b.y);
     }
 
     // Column gap edges
     g.lineStyle(2, 0x444466);
-    g.lineBetween(COLUMN_GAP_LEFT, COLUMN_GROUND_Y, COLUMN_GAP_LEFT, COLUMN_GROUND_Y + 400);
-    g.lineBetween(COLUMN_GAP_RIGHT, COLUMN_GROUND_Y, COLUMN_GAP_RIGHT, COLUMN_GROUND_Y + 400);
+    g.lineBetween(COLUMN_GAP_LEFT, COLUMN_GROUND_Y, COLUMN_GAP_LEFT, COLUMN_GROUND_Y + 300);
+    g.lineBetween(COLUMN_GAP_RIGHT, COLUMN_GROUND_Y, COLUMN_GAP_RIGHT, COLUMN_GROUND_Y + 300);
 
     g.setDepth(-1);
   }
 
-  /** Get terrain height at a given X position */
   static getHeightAt(x: number): number {
     for (let i = 0; i < TERRAIN_POINTS.length - 1; i++) {
       const a = TERRAIN_POINTS[i]!;
