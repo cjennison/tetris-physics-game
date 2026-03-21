@@ -79,7 +79,7 @@ Phases are sequential — each builds on the previous. Within a phase, tasks can
 
 ---
 
-## Phase 4: Settling Detection `[~]`
+## Phase 4: Settling Detection `[x]`
 
 **Goal**: Detect when a dropped piece has stopped moving. Transition state machine correctly.
 
@@ -87,16 +87,22 @@ Phases are sequential — each builds on the previous. Within a phase, tasks can
 
 **Tasks**:
 - [x] Track velocity of active piece after drop
-- [x] Implement settling check: velocity < threshold for N consecutive frames
-- [x] State machine transitions: DROPPING → SETTLING → (next state)
-- [ ] Visual indicator when piece is "settling" (brief flash or opacity change)
-- [ ] Handle edge case: piece bounces off and never settles (timeout → force settle)
+- [x] Implement settling check: replaced with 1-second drop timer for snappy feel
+- [x] State machine transitions: DROPPING → (1s timer) → LASER_CHECK → SPAWNING
+- [x] Handle edge case: glass/concrete shatter detected via body destruction check
+- [x] Handle edge case: spawn blocked by debris → WAITING state until hook area clear
 
 **Acceptance Criteria**:
-- [ ] Piece is detected as settled within 1-2 seconds of stopping
-- [ ] State machine transitions correctly through all states
-- [ ] No infinite loops in state machine
-- [ ] Stacked pieces settle correctly even when wobbling
+- [x] Next piece spawns ~1 second after drop
+- [x] State machine transitions correctly through all states
+- [x] No infinite loops in state machine
+- [x] Destroyed pieces (glass/concrete) properly transition to next spawn
+
+### Physics Tuning Backlog (revisit after lasers)
+- [ ] Angular damping — pieces still rotate too freely after landing
+- [ ] Rubber momentum transfer — rubber bouncing still pushes heavy pieces ~8px
+- [ ] Settle visual indicator (brief flash or opacity change)
+- [ ] Consider per-material drop timers (rubber could have longer timer since bouncing IS its identity)
 
 ---
 
