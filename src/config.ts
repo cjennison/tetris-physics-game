@@ -3,9 +3,9 @@
  */
 import Phaser from 'phaser';
 
-/** Viewport (what the player sees — camera shows a portion of the landscape) */
-export const VIEWPORT_WIDTH = 1000;
-export const VIEWPORT_HEIGHT = 700;
+/** Viewport — 16:9 base resolution, Phaser FIT scales to fill window */
+export const VIEWPORT_WIDTH = 1280;
+export const VIEWPORT_HEIGHT = 720;
 
 /** Landscape (full world — much bigger than viewport, camera pans/zooms) */
 export const LANDSCAPE_WIDTH = 2000;

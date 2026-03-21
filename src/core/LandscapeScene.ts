@@ -192,27 +192,25 @@ export class LandscapeScene extends Phaser.Scene {
     );
   }
 
+  /** Compute min zoom so camera never shows outside landscape */
+  private getMinZoom(): number {
+    const cam = this.cameras.main;
+    return Math.max(cam.width / LANDSCAPE_WIDTH, cam.height / LANDSCAPE_HEIGHT);
+  }
+
   private setupCamera(): void {
     const cam = this.cameras.main;
-
-    /**
-     * LEARN: The minimum zoom is calculated so the camera never shows
-     * area outside the landscape bounds. At min zoom, the entire
-     * landscape fills the viewport exactly. As the map grows (more
-     * columns), the min zoom decreases to accommodate.
-     *
-     * minZoom = max(viewportWidth/landscapeWidth, viewportHeight/landscapeHeight)
-     * This preserves aspect ratio — the tighter dimension constrains.
-     */
-    const minZoom = Math.max(
-      cam.width / LANDSCAPE_WIDTH,
-      cam.height / LANDSCAPE_HEIGHT,
-    );
     const maxZoom = 2.0;
 
     // Start focused on the lower-left (pile area)
-    cam.setZoom(Math.max(1.0, minZoom));
+    cam.setZoom(Math.max(1.0, this.getMinZoom()));
     cam.centerOn(300, 850);
+
+    // Recalculate on resize
+    this.scale.on('resize', () => {
+      const min = this.getMinZoom();
+      if (cam.zoom < min) cam.setZoom(min);
+    });
 
     // Zoom with mouse wheel
     this.input.on('wheel', (
@@ -221,7 +219,8 @@ export class LandscapeScene extends Phaser.Scene {
       _deltaX: number,
       deltaY: number,
     ) => {
-      const newZoom = Phaser.Math.Clamp(cam.zoom + (deltaY > 0 ? -0.05 : 0.05), minZoom, maxZoom);
+      const min = this.getMinZoom();
+      const newZoom = Phaser.Math.Clamp(cam.zoom + (deltaY > 0 ? -0.05 : 0.05), min, maxZoom);
       cam.setZoom(newZoom);
     });
 
@@ -280,7 +279,7 @@ export class LandscapeScene extends Phaser.Scene {
           this.input.pointer2.x, this.input.pointer2.y,
         );
         if (pinchDist > 0) {
-          cam.setZoom(Phaser.Math.Clamp(cam.zoom * (newDist / pinchDist), minZoom, maxZoom));
+          cam.setZoom(Phaser.Math.Clamp(cam.zoom * (newDist / pinchDist), this.getMinZoom(), maxZoom));
         }
         pinchDist = newDist;
       }
