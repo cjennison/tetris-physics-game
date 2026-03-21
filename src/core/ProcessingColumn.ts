@@ -51,6 +51,9 @@ export class ProcessingColumn {
   // Active piece tracking
   private activePiece: SpawnedPiece | null = null;
   private dropTime = 0;
+  /** When the piece was received — auto-drops after a delay */
+  private receiveTime = 0;
+  private readonly AUTO_DROP_DELAY = 1500; // 1.5s to swing, then auto-drop
 
   // Visuals
   private wallGraphics!: Phaser.GameObjects.Graphics;
@@ -142,6 +145,7 @@ export class ProcessingColumn {
     this.craneSystem.attachPiece(piece.body, piece.material);
 
     this.materialText.setText(`${piece.material.label} ${piece.definition.name}`);
+    this.receiveTime = Date.now();
     this.events.emit(EventBus.PIECE_SPAWNED, {
       name: piece.definition.name,
       material: piece.materialKey,
@@ -163,6 +167,7 @@ export class ProcessingColumn {
   }
 
   private handleSwinging(): void {
+    // Column crane still accepts keyboard input for manual control
     const actions = this.inputSystem.getActions();
     this.craneSystem.update(actions);
 
@@ -172,7 +177,9 @@ export class ProcessingColumn {
       return;
     }
 
-    if (actions.drop) {
+    // Auto-drop after delay (or manual drop via space)
+    const elapsed = Date.now() - this.receiveTime;
+    if (actions.drop || elapsed >= this.AUTO_DROP_DELAY) {
       const droppedBody = this.craneSystem.dropPiece();
       if (droppedBody) {
         this.dropTime = Date.now();

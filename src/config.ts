@@ -7,33 +7,42 @@
  */
 import Phaser from 'phaser';
 
-/** Viewport (what the player sees — the camera scrolls across the landscape) */
-export const VIEWPORT_WIDTH = 800;
-export const VIEWPORT_HEIGHT = 800;
+/** Viewport */
+export const VIEWPORT_WIDTH = 1200;
+export const VIEWPORT_HEIGHT = 700;
 
-/** Landscape (the full world — wider than viewport, camera scrolls) */
-export const LANDSCAPE_WIDTH = 2000;
-export const LANDSCAPE_HEIGHT = 800;
-export const GROUND_Y = 600; // Y position of ground surface
+/** Landscape */
+export const LANDSCAPE_WIDTH = 1200;
+export const LANDSCAPE_HEIGHT = 700;
+export const GROUND_Y = 500; // Ground surface Y
 
 /** Physics tuning */
 export const GRAVITY_Y = 2.0;
 
 /** Board boundaries */
-export const WALL_THICKNESS = 20;
+export const WALL_THICKNESS = 15;
 
-/** Hopper dimensions */
-export const HOPPER_X = 20;
-export const HOPPER_WIDTH = 350;
-export const HOPPER_HEIGHT = 500;
-export const HOPPER_Y = GROUND_Y - HOPPER_HEIGHT; // Top of hopper
+/** Pipe (drops trash onto the ground from above) */
+export const PIPE_X = 80;  // Center X of the pipe opening
+export const PIPE_Y = 50;  // Y of pipe opening (top of screen)
+export const PIPE_WIDTH = 80;
+
+/** Trash pile zone (where pieces land from the pipe) */
+export const PILE_LEFT = 20;
+export const PILE_RIGHT = 250;
 
 /** Processing column dimensions */
-export const COLUMN_WIDTH = 300;
-export const COLUMN_HEIGHT = 550;
+export const COLUMN_WIDTH = 200;
+export const COLUMN_HEIGHT = 400;
 export const COLUMN_START_X = 500; // X position of first column
-export const COLUMN_SPACING = 100; // Gap between columns
-export const COLUMN_TOP_Y = GROUND_Y - COLUMN_HEIGHT; // Top of column shaft
+export const COLUMN_SPACING = 80;
+export const COLUMN_TOP_Y = GROUND_Y - COLUMN_HEIGHT;
+
+/** Crane vehicle */
+export const VEHICLE_Y = GROUND_Y - 25; // Drives just above ground
+export const VEHICLE_WIDTH = 50;
+export const VEHICLE_HEIGHT = 30;
+export const VEHICLE_SPEED = 3;
 
 /** Phaser game config */
 export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
@@ -42,7 +51,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
     width: VIEWPORT_WIDTH,
     height: VIEWPORT_HEIGHT,
     parent,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#0d0d1a',
     physics: {
       default: 'matter',
       matter: {
