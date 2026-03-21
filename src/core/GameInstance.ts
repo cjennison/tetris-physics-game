@@ -389,7 +389,7 @@ export class GameInstance extends Phaser.Scene {
     this.matter.add.rectangle(w / 2, h - WALL_THICKNESS / 2, w, WALL_THICKNESS, {
       isStatic: true,
       label: 'floor',
-      collisionFilter: { category: 0x0001, mask: 0x0002 },
+      collisionFilter: { category: 0x0001, mask: 0x0002 | 0x0004 },
     });
 
     /**
@@ -405,14 +405,14 @@ export class GameInstance extends Phaser.Scene {
     this.matter.add.rectangle(WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallHeight, {
       isStatic: true,
       label: 'wall-left',
-      collisionFilter: { category: 0x0001, mask: 0x0002 },
+      collisionFilter: { category: 0x0001, mask: 0x0002 | 0x0004 },
     });
 
     // Right wall
     this.matter.add.rectangle(w - WALL_THICKNESS / 2, wallCenterY, WALL_THICKNESS, wallHeight, {
       isStatic: true,
       label: 'wall-right',
-      collisionFilter: { category: 0x0001, mask: 0x0002 },
+      collisionFilter: { category: 0x0001, mask: 0x0002 | 0x0004 },
     });
   }
 

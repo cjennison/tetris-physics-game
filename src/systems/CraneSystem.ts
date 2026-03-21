@@ -91,7 +91,7 @@ export class CraneSystem {
         frictionAir: 0.01,
         collisionFilter: {
           category: CollisionCategory.CRANE,
-          mask: 0, // Hook doesn't collide with anything
+          mask: CollisionCategory.WALL, // Hook bounces off walls
         },
       },
     );
