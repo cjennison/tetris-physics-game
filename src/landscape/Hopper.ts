@@ -13,9 +13,13 @@ import { PILE_LEFT, PILE_RIGHT } from '../config';
 import { Terrain } from './Terrain';
 
 /** Chute configuration */
-const CHUTE_EXIT_X = 60;   // Where pieces come out (X)
-const CHUTE_EXIT_Y = 280;  // Where pieces come out (Y)
-const CHUTE_ANGLE = 0.5;   // Angle of the chute (radians, tilted right)
+const CHUTE_EXIT_X = 80;    // Where pieces come out (X)
+const CHUTE_EXIT_Y = 320;   // Where pieces come out (Y)
+const CHUTE_ANGLE = 0.55;   // Angle of the chute (radians, tilted right)
+const CHUTE_LENGTH = 220;   // Full ramp length (extends off-screen left)
+/** Spawn point — top of the ramp, off-screen behind the left wall */
+const SPAWN_X = CHUTE_EXIT_X - Math.cos(CHUTE_ANGLE) * CHUTE_LENGTH;
+const SPAWN_Y = CHUTE_EXIT_Y - Math.sin(CHUTE_ANGLE) * CHUTE_LENGTH;
 
 export interface HopperConfig {
   spawnInterval: number;
@@ -106,34 +110,50 @@ export class Hopper {
   }
 
   private spawnPiece(): void {
-    // Spawn at the chute exit with a slight rightward velocity (slides out)
-    const x = CHUTE_EXIT_X;
-    const y = CHUTE_EXIT_Y;
-    const spawned = this.factory.spawnPiece(x, y);
+    /**
+     * LEARN: Pieces spawn off-screen at the top of the ramp (behind the
+     * left wall) and slide down the chute under gravity. The player sees
+     * them emerge from the wall and tumble onto the pile — no popping
+     * into existence.
+     */
+    const spawned = this.factory.spawnPiece(SPAWN_X, SPAWN_Y);
 
-    // Give it velocity matching the chute angle so it slides out
+    // Give a small nudge along the ramp direction to start sliding
     this.scene.matter.body.setVelocity(spawned.body, {
-      x: Math.cos(CHUTE_ANGLE) * 3,
-      y: Math.sin(CHUTE_ANGLE) * 2,
+      x: Math.cos(CHUTE_ANGLE) * 2,
+      y: Math.sin(CHUTE_ANGLE) * 1,
     });
 
     this.renderer.addBody(spawned.body);
   }
 
-  /** Create physics walls for the chute so pieces slide along it */
+  /** Create the chute ramp — long angled surface from off-screen to the exit */
   private createChutePhysics(): void {
-    // Chute bottom ramp — angled surface pieces slide on
-    const rampLength = 120;
-    const rampMidX = 30 + Math.cos(CHUTE_ANGLE) * rampLength / 2;
-    const rampMidY = CHUTE_EXIT_Y - 30 + Math.sin(CHUTE_ANGLE) * rampLength / 2;
+    // Bottom ramp — extends from off-screen through the wall to the exit
+    const rampMidX = (SPAWN_X + CHUTE_EXIT_X) / 2;
+    const rampMidY = (SPAWN_Y + CHUTE_EXIT_Y) / 2;
 
     this.scene.matter.add.rectangle(
-      rampMidX, rampMidY, rampLength, 10,
+      rampMidX, rampMidY, CHUTE_LENGTH + 20, 10,
       {
         isStatic: true,
         angle: CHUTE_ANGLE,
-        label: 'chute-ramp',
-        friction: 0.3,
+        label: 'chute-ramp-bottom',
+        friction: 0.2,
+        collisionFilter: { category: 0x0001, mask: 0x0002 },
+      },
+    );
+
+    // Top wall of chute — keeps pieces from flying off the ramp
+    this.scene.matter.add.rectangle(
+      rampMidX - Math.sin(CHUTE_ANGLE) * 35,
+      rampMidY + Math.cos(CHUTE_ANGLE) * 35,
+      CHUTE_LENGTH + 20, 8,
+      {
+        isStatic: true,
+        angle: CHUTE_ANGLE,
+        label: 'chute-ramp-top',
+        friction: 0.1,
         collisionFilter: { category: 0x0001, mask: 0x0002 },
       },
     );
@@ -142,36 +162,35 @@ export class Hopper {
   private drawChute(): void {
     const g = this.scene.add.graphics();
 
-    // Chute body — comes from the left wall at an angle
-    const wallX = 30; // Left wall thickness
-    const startY = 100;
-    const endX = CHUTE_EXIT_X + 60;
-    const endY = CHUTE_EXIT_Y;
-    const chuteWidth = 50;
+    const wallX = 30;
+    const chuteWidth = 45;
+    // Compute where the ramp meets the left wall
+    const wallMeetY = CHUTE_EXIT_Y - Math.tan(CHUTE_ANGLE) * (CHUTE_EXIT_X - wallX);
 
-    // Upper edge
-    g.lineStyle(3, 0x555566);
-    g.lineBetween(wallX, startY, endX, endY - chuteWidth / 2);
-    // Lower edge (ramp)
-    g.lineBetween(wallX, startY + chuteWidth, endX, endY + chuteWidth / 2);
+    // Chute body — angled channel from wall to exit
+    // Bottom edge (ramp surface)
+    g.lineStyle(2, 0x555566);
+    g.lineBetween(wallX, wallMeetY + chuteWidth / 2, CHUTE_EXIT_X + 15, CHUTE_EXIT_Y + chuteWidth / 2);
+    // Top edge
+    g.lineBetween(wallX, wallMeetY - chuteWidth / 2, CHUTE_EXIT_X + 15, CHUTE_EXIT_Y - chuteWidth / 2);
 
     // Fill
-    g.fillStyle(0x3a3a4a, 0.6);
+    g.fillStyle(0x3a3a4a, 0.5);
     g.beginPath();
-    g.moveTo(wallX, startY);
-    g.lineTo(endX, endY - chuteWidth / 2);
-    g.lineTo(endX, endY + chuteWidth / 2);
-    g.lineTo(wallX, startY + chuteWidth);
+    g.moveTo(wallX, wallMeetY - chuteWidth / 2);
+    g.lineTo(CHUTE_EXIT_X + 15, CHUTE_EXIT_Y - chuteWidth / 2);
+    g.lineTo(CHUTE_EXIT_X + 15, CHUTE_EXIT_Y + chuteWidth / 2);
+    g.lineTo(wallX, wallMeetY + chuteWidth / 2);
     g.closePath();
     g.fillPath();
 
-    // Wall backing (solid rectangle on the left wall where chute exits)
-    g.fillStyle(0x444455);
-    g.fillRect(0, startY - 10, wallX + 5, chuteWidth + 20);
+    // Wall cover — hides the part of the chute behind the wall
+    g.fillStyle(0x333344);
+    g.fillRect(0, 0, wallX + 2, wallMeetY + chuteWidth);
 
-    // Opening lip
-    g.fillStyle(0x666677);
-    g.fillRect(endX - 5, endY - chuteWidth / 2 - 3, 10, chuteWidth + 6);
+    // Opening lip at the exit
+    g.fillStyle(0x555566);
+    g.fillRect(CHUTE_EXIT_X + 10, CHUTE_EXIT_Y - chuteWidth / 2 - 3, 8, chuteWidth + 6);
 
     g.setDepth(7);
   }
