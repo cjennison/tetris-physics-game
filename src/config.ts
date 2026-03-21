@@ -12,7 +12,7 @@ export const GAME_WIDTH = 480;
 export const GAME_HEIGHT = 800;
 
 /** Physics tuning */
-export const GRAVITY_Y = 1.5;
+export const GRAVITY_Y = 2.0;
 export const CONSTRAINT_ITERATIONS = 4; // Higher = more stable constraints
 
 /** Crane tuning */
@@ -50,7 +50,24 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
       matter: {
         gravity: { x: 0, y: GRAVITY_Y },
         debug: false,
-        enableSleeping: false,
+        /**
+         * LEARN: Sleeping lets bodies that haven't moved "go to sleep."
+         * Sleeping bodies use zero CPU and don't react to small forces.
+         * They only wake up when something fast/heavy hits them directly.
+         * This is why the bottom of a stack stays rock-solid when you
+         * drop something on top — the bottom pieces are asleep and the
+         * impact isn't strong enough to wake them through 5 layers.
+         */
+        enableSleeping: true,
+        /**
+         * LEARN: positionIterations and velocityIterations control how
+         * many times per frame the physics engine resolves overlaps and
+         * velocities. Higher = more accurate stacking (bodies don't
+         * sink through each other) but more CPU. Default is 6/4.
+         * We bump to 10/8 for solid, heavy-feeling stacks.
+         */
+        positionIterations: 10,
+        velocityIterations: 8,
       },
     },
     scale: {
