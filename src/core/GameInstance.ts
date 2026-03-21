@@ -198,6 +198,10 @@ export class GameInstance extends Phaser.Scene {
    */
   private handleSwinging(): void {
     const actions = this.inputSystem.getActions();
+    // Test API can override crane position (persists until cleared with -1)
+    if (this.testCraneTarget !== null && this.testCraneTarget >= 0) {
+      actions.horizontalTarget = this.testCraneTarget;
+    }
     this.craneSystem.update(actions);
 
     // If the piece shattered while on the rope (e.g., swung into a wall),
@@ -277,6 +281,42 @@ export class GameInstance extends Phaser.Scene {
       this.settleCounter = 0;
       this.setState('dropping');
     }
+  }
+
+  // --- Test API helpers (called by TestAPI.ts) ---
+
+  /** Get the PieceFactory for setting forced shapes/materials */
+  getFactory(): PieceFactory { return this.pieceFactory; }
+
+  /** Programmatically drop the current piece */
+  testDrop(): void {
+    if (this.state === 'swinging') {
+      this.craneSystem.dropPiece();
+      this.events.emit(EventBus.PIECE_DROPPED);
+      this.setState('dropping');
+    }
+  }
+
+  /** Programmatically set the crane target (0-1) for the next update */
+  private testCraneTarget: number | null = null;
+  testMoveCrane(x: number): void {
+    this.testCraneTarget = x;
+  }
+
+  /** Get info about the active piece */
+  getActivePieceInfo(): { shape: string; material: string } | null {
+    if (!this.activePiece) return null;
+    return {
+      shape: this.activePiece.definition.name,
+      material: this.activePiece.materialKey,
+    };
+  }
+
+  /** Get the crane's current X position (normalized 0-1) */
+  getCraneX(): number {
+    const left = WALL_THICKNESS;
+    const right = this.boardConfig.width - WALL_THICKNESS;
+    return (this.craneSystem.getTrolleyX() - left) / (right - left);
   }
 
   /** Check if a body has been removed from the physics world (e.g., glass shattered) */

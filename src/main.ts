@@ -8,6 +8,7 @@
 import Phaser from 'phaser';
 import { createGameConfig } from './config';
 import { GameManager } from './core/GameManager';
+import { installTestAPI } from './core/TestAPI';
 
 const config = createGameConfig('game-container');
 const game = new Phaser.Game(config);
@@ -28,3 +29,6 @@ manager.addBoard({
 
 // Expose for debugging in browser console
 (window as unknown as Record<string, unknown>).__TRASH = { game, manager };
+
+// Install test API for Playwright-driven automated testing
+installTestAPI(manager);
