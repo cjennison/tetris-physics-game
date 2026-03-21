@@ -1,42 +1,37 @@
 /**
- * Terrain — Hilly dump landscape
+ * Terrain — Hilly dump landscape (bottom half of the world)
  *
- * LEARN: After multiple failed approaches (rotated rectangles, fromVertices
- * with centroid correction), the most reliable method is the simplest:
- * use Phaser's built-in matter.add.fromPhysicsEditor-style approach with
- * many small FLAT static rectangles stacked like stairs to approximate
- * the terrain slope. Each rectangle is axis-aligned (no rotation) and
- * positioned at exact coordinates. Boring but bulletproof.
+ * The terrain spans the bottom of the landscape. Upper half is sky/air.
+ * Hopper drops pieces from upper-left, they fall to the lower-left
+ * pile area. Terrain rises from left to right, with the processing
+ * column sunk into the hilltop on the right side.
  *
- * We sample the terrain curve at 10px intervals and place a thin
- * rectangle at each sample point. The visual is drawn with the smooth
- * curve, while physics uses the staircase approximation (invisible at
- * 10px resolution).
+ * Physics: staircase of flat rectangles every 10px (bulletproof).
  */
 import Phaser from 'phaser';
 import { LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT } from '../config';
 
+/** Terrain surface profile — defines the ground from left to right */
 export const TERRAIN_POINTS: Array<{ x: number; y: number }> = [
-  { x: 0,    y: 520 },
-  { x: 80,   y: 530 },
-  { x: 160,  y: 520 },
-  { x: 260,  y: 505 },
-  { x: 350,  y: 475 },
-  { x: 430,  y: 440 },
-  { x: 500,  y: 415 },
-  { x: 540,  y: 400 },
-  // --- Column gap 540–740 ---
-  { x: 740,  y: 400 },
-  { x: 800,  y: 410 },
-  { x: 900,  y: 430 },
-  { x: 1000, y: 445 },
-  { x: 1100, y: 455 },
-  { x: 1200, y: 460 },
+  { x: 0,    y: 950 },    // Far left — low area (pile zone)
+  { x: 100,  y: 960 },    // Slight dip
+  { x: 250,  y: 950 },    // Pile area
+  { x: 400,  y: 930 },    // Start rising
+  { x: 550,  y: 890 },    // Hill begins
+  { x: 700,  y: 840 },    // Steeper
+  { x: 850,  y: 790 },    // Approaching column
+  { x: 950,  y: 760 },    // Just before column gap
+  // --- Column gap 950–1200 ---
+  { x: 1200, y: 760 },    // After column gap
+  { x: 1350, y: 775 },    // Gentle slope right of column
+  { x: 1500, y: 800 },    // Continues
+  { x: 1700, y: 830 },    // Far right plateau
+  { x: 2000, y: 850 },    // Right edge
 ];
 
-export const COLUMN_GAP_LEFT = 540;
-export const COLUMN_GAP_RIGHT = 740;
-export const COLUMN_GROUND_Y = 400;
+export const COLUMN_GAP_LEFT = 950;
+export const COLUMN_GAP_RIGHT = 1200;
+export const COLUMN_GROUND_Y = 760;
 
 export class Terrain {
   private scene: Phaser.Scene;
@@ -47,42 +42,30 @@ export class Terrain {
     this.draw();
   }
 
-  /**
-   * Create terrain as a dense staircase of flat rectangles.
-   * Each rectangle is 10px wide, positioned at the terrain height.
-   * No rotation — just axis-aligned boxes. Simple and reliable.
-   */
   private createPhysicsStaircase(): void {
     const collisionFilter = { category: 0x0001, mask: 0x0002 | 0x0010 };
-    const step = 10; // Sample every 10px
-    const depth = 300; // How deep each block extends below the surface
+    const step = 10;
+    const depth = 400;
 
     for (let x = 0; x < LANDSCAPE_WIDTH; x += step) {
-      // Skip the column gap
       if (x >= COLUMN_GAP_LEFT && x < COLUMN_GAP_RIGHT) continue;
 
       const surfaceY = Terrain.getHeightAt(x + step / 2);
 
       this.scene.matter.add.rectangle(
-        x + step / 2,           // Center X
-        surfaceY + depth / 2,   // Center Y (surface + half depth)
-        step + 1,               // Width (+1 for overlap, no gaps)
-        depth,                  // Height
-        {
-          isStatic: true,
-          label: 'terrain',
-          friction: 0.8,
-          collisionFilter,
-        },
+        x + step / 2,
+        surfaceY + depth / 2,
+        step + 1,
+        depth,
+        { isStatic: true, label: 'terrain', friction: 0.8, collisionFilter },
       );
     }
 
     // Bridge over column gap (vehicle only)
-    const bridgeWidth = COLUMN_GAP_RIGHT - COLUMN_GAP_LEFT + 20;
     this.scene.matter.add.rectangle(
       (COLUMN_GAP_LEFT + COLUMN_GAP_RIGHT) / 2,
       COLUMN_GROUND_Y + 5,
-      bridgeWidth, 15,
+      COLUMN_GAP_RIGHT - COLUMN_GAP_LEFT + 20, 15,
       {
         isStatic: true, label: 'column-bridge', friction: 0.8,
         collisionFilter: { category: 0x0020, mask: 0x0010 },
@@ -116,13 +99,12 @@ export class Terrain {
 
     // Column gap edges
     g.lineStyle(2, 0x444466);
-    g.lineBetween(COLUMN_GAP_LEFT, COLUMN_GROUND_Y, COLUMN_GAP_LEFT, COLUMN_GROUND_Y + 300);
-    g.lineBetween(COLUMN_GAP_RIGHT, COLUMN_GROUND_Y, COLUMN_GAP_RIGHT, COLUMN_GROUND_Y + 300);
+    g.lineBetween(COLUMN_GAP_LEFT, COLUMN_GROUND_Y, COLUMN_GAP_LEFT, COLUMN_GROUND_Y + 350);
+    g.lineBetween(COLUMN_GAP_RIGHT, COLUMN_GROUND_Y, COLUMN_GAP_RIGHT, COLUMN_GROUND_Y + 350);
 
     g.setDepth(-1);
   }
 
-  /** Get terrain height at a given X by interpolating between points */
   static getHeightAt(x: number): number {
     for (let i = 0; i < TERRAIN_POINTS.length - 1; i++) {
       const a = TERRAIN_POINTS[i]!;

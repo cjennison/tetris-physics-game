@@ -13,10 +13,10 @@ import { PILE_LEFT, PILE_RIGHT } from '../config';
 import { Terrain } from './Terrain';
 
 /** Chute configuration */
-const CHUTE_EXIT_X = 70;    // Exits just past the wall
-const CHUTE_EXIT_Y = 220;   // High up — pieces fall a long way
-const CHUTE_ANGLE = 0.5;    // Steeper so pieces shoot out faster
-const CHUTE_LENGTH = 150;   // Short — mostly behind the wall
+const CHUTE_EXIT_X = 80;    // Exits just past the left wall
+const CHUTE_EXIT_Y = 500;   // Upper-left area — pieces fall to terrain below (~950)
+const CHUTE_ANGLE = 0.5;    // Steep enough to slide fast
+const CHUTE_LENGTH = 160;   // Mostly behind the wall
 const CHUTE_WIDTH = 80;     // Channel width
 /** Spawn point — top of the ramp, off-screen behind the left wall */
 const SPAWN_X = CHUTE_EXIT_X - Math.cos(CHUTE_ANGLE) * CHUTE_LENGTH;

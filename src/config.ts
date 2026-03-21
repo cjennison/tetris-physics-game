@@ -3,13 +3,13 @@
  */
 import Phaser from 'phaser';
 
-/** Viewport */
-export const VIEWPORT_WIDTH = 1200;
+/** Viewport (what the player sees — camera shows a portion of the landscape) */
+export const VIEWPORT_WIDTH = 1000;
 export const VIEWPORT_HEIGHT = 700;
 
-/** Landscape */
-export const LANDSCAPE_WIDTH = 1200;
-export const LANDSCAPE_HEIGHT = 700;
+/** Landscape (full world — much bigger than viewport, camera pans/zooms) */
+export const LANDSCAPE_WIDTH = 2000;
+export const LANDSCAPE_HEIGHT = 1200;
 
 /** Physics tuning */
 export const GRAVITY_Y = 2.0;
@@ -17,17 +17,17 @@ export const GRAVITY_Y = 2.0;
 /** Board boundaries */
 export const WALL_THICKNESS = 15;
 
-/** Pipe (drops trash from above on the left) */
+/** Pipe (drops trash from upper-left wall area) */
 export const PIPE_X = 100;
-export const PIPE_Y = 50;
+export const PIPE_Y = 300;
 export const PIPE_WIDTH = 80;
 
-/** Trash pile zone (where pieces land from the pipe — low area) */
+/** Trash pile zone (lower-left where pieces land) */
 export const PILE_LEFT = 30;
-export const PILE_RIGHT = 250;
+export const PILE_RIGHT = 400;
 
 /** Processing column dimensions */
-export const COLUMN_HEIGHT = 250;
+export const COLUMN_HEIGHT = 300;
 
 /** Crane vehicle */
 export const VEHICLE_WIDTH = 50;

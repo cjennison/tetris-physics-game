@@ -1,8 +1,11 @@
 /**
- * LandscapeScene — The dump landscape
+ * LandscapeScene — The full dump world
  *
- * Left wall with pipe chute → trash pile → hilly terrain → column
- * Vehicle drives across terrain, grabs from pile, drops into column.
+ * Layout (2000 x 1200):
+ *   Upper-Left: Pipe drops pieces from here
+ *   Lower-Left: Pile zone — pieces land, vehicle picks up
+ *   Lower-Right: Hilltop with processing column
+ *   Camera starts zoomed in on lower-left, pans to follow vehicle
  */
 import Phaser from 'phaser';
 import { PieceRenderer } from '../systems/PieceRenderer';
@@ -14,6 +17,7 @@ import {
   LANDSCAPE_WIDTH,
   LANDSCAPE_HEIGHT,
   COLUMN_HEIGHT,
+  VIEWPORT_HEIGHT,
 } from '../config';
 
 export class LandscapeScene extends Phaser.Scene {
@@ -27,7 +31,7 @@ export class LandscapeScene extends Phaser.Scene {
   }
 
   create(): void {
-    // Camera — allow zooming out to see the full landscape
+    // Camera — world is bigger than viewport
     this.cameras.main.setBounds(0, 0, LANDSCAPE_WIDTH, LANDSCAPE_HEIGHT);
 
     // Global piece renderer
@@ -42,14 +46,14 @@ export class LandscapeScene extends Phaser.Scene {
     // Terrain
     new Terrain(this);
 
-    // Boundary walls
+    // Walls
     this.createWalls();
 
-    // Hopper (pipe from upper-left wall)
+    // Hopper (pipe from upper-left)
     const hopperConfig: HopperConfig = { spawnInterval: 4 };
     this.hopper = new Hopper(this, hopperConfig, this.pieceRenderer);
 
-    // Processing column
+    // Processing column (sunk into hilltop)
     const columnWidth = COLUMN_GAP_RIGHT - COLUMN_GAP_LEFT;
     const col1Config: ColumnConfig = {
       id: 'column-1',
@@ -63,8 +67,8 @@ export class LandscapeScene extends Phaser.Scene {
     col1.create();
     this.columns.push(col1);
 
-    // Crane vehicle
-    this.vehicle = new CraneVehicle(this, this.pieceRenderer, 250);
+    // Crane vehicle (starts in the lower-left pile area)
+    this.vehicle = new CraneVehicle(this, this.pieceRenderer, 300);
 
     for (const col of this.columns) {
       this.vehicle.addColumnZone(
@@ -74,24 +78,21 @@ export class LandscapeScene extends Phaser.Scene {
       );
     }
 
-    // Zoom controls
-    this.setupZoom();
+    // Camera: start zoomed in on the lower-left (pile area)
+    this.setupCamera();
 
-    // Instructions (fixed to camera, not world)
+    // HUD (fixed to camera)
     const instructions = this.add.text(0, 0,
-      '← → drive  |  ↑↓ boom  |  SHIFT+↑↓ rope  |  SPACE grab/drop  |  scroll = zoom', {
-        fontSize: '11px', color: '#445566', fontFamily: 'monospace',
-        backgroundColor: '#0d0d1a88',
-        padding: { x: 6, y: 4 },
-      }).setDepth(20);
-    // Pin to bottom of camera viewport
-    instructions.setScrollFactor(0);
-    instructions.setPosition(10, this.cameras.main.height - 20);
+      '← → drive  |  ↑↓ boom  |  SHIFT+↑↓ rope  |  SPACE grab/drop  |  scroll zoom  |  middle-drag pan', {
+        fontSize: '10px', color: '#445566', fontFamily: 'monospace',
+        backgroundColor: '#0d0d1a99',
+        padding: { x: 6, y: 3 },
+      }).setDepth(20).setScrollFactor(0).setPosition(5, VIEWPORT_HEIGHT - 18);
+    void instructions;
 
-    const title = this.add.text(0, 0, 'T R A S H', {
-      fontSize: '16px', color: '#223344', fontFamily: 'monospace',
-    }).setDepth(20).setScrollFactor(0).setPosition(10, 5);
-    void title;
+    this.add.text(0, 0, 'T R A S H', {
+      fontSize: '14px', color: '#223344', fontFamily: 'monospace',
+    }).setDepth(20).setScrollFactor(0).setPosition(5, 5);
   }
 
   update(time: number, delta: number): void {
@@ -107,75 +108,116 @@ export class LandscapeScene extends Phaser.Scene {
     const wallThickness = 30;
     const wallFilter = { category: 0x0001, mask: 0x0002 | 0x0010 };
 
-    /**
-     * LEARN: The left wall has a GAP where the chute exits. Pieces spawn
-     * off-screen and slide through this gap into the landscape. The wall
-     * is split into two parts: above the chute and below the chute.
-     */
-    const gapTop = 100;    // Top of chute opening — high up
-    const gapBottom = 320; // Bottom of chute opening
+    // Left wall gap for chute (Y 380–580)
+    const gapTop = 380;
+    const gapBottom = 580;
 
-    // Left wall visual (with gap)
+    // Left wall — above gap
     const g = this.add.graphics();
     g.fillStyle(0x333344);
-    g.fillRect(0, 0, wallThickness, gapTop);                                    // Above gap
-    g.fillRect(0, gapBottom, wallThickness, LANDSCAPE_HEIGHT - gapBottom);       // Below gap
+    g.fillRect(0, 0, wallThickness, gapTop);
+    g.fillRect(0, gapBottom, wallThickness, LANDSCAPE_HEIGHT - gapBottom);
     g.setDepth(6);
 
-    // Left wall physics — above gap
-    const aboveH = gapTop;
     this.matter.add.rectangle(
-      wallThickness / 2, aboveH / 2, wallThickness, aboveH,
+      wallThickness / 2, gapTop / 2, wallThickness, gapTop,
       { isStatic: true, label: 'wall-left-above', collisionFilter: wallFilter },
     );
-    // Left wall physics — below gap
-    const belowH = LANDSCAPE_HEIGHT - gapBottom + 200; // Extra below screen
     this.matter.add.rectangle(
-      wallThickness / 2, gapBottom + belowH / 2, wallThickness, belowH,
+      wallThickness / 2, gapBottom + (LANDSCAPE_HEIGHT - gapBottom) / 2,
+      wallThickness, LANDSCAPE_HEIGHT - gapBottom + 200,
       { isStatic: true, label: 'wall-left-below', collisionFilter: wallFilter },
     );
 
-    // Right wall (solid, no gap)
+    // Right wall
     const g2 = this.add.graphics();
     g2.fillStyle(0x333344);
     g2.fillRect(LANDSCAPE_WIDTH - wallThickness, 0, wallThickness, LANDSCAPE_HEIGHT);
     g2.setDepth(6);
 
     this.matter.add.rectangle(
-      LANDSCAPE_WIDTH - wallThickness / 2, LANDSCAPE_HEIGHT / 2, wallThickness, LANDSCAPE_HEIGHT * 2,
+      LANDSCAPE_WIDTH - wallThickness / 2, LANDSCAPE_HEIGHT / 2,
+      wallThickness, LANDSCAPE_HEIGHT * 2,
       { isStatic: true, label: 'wall-right', collisionFilter: wallFilter },
+    );
+
+    // Ceiling (prevent pieces flying off the top)
+    this.matter.add.rectangle(
+      LANDSCAPE_WIDTH / 2, -10, LANDSCAPE_WIDTH, 20,
+      { isStatic: true, label: 'ceiling', collisionFilter: wallFilter },
     );
   }
 
-  private setupZoom(): void {
-    // Mouse wheel zoom
-    this.input.on('wheel', (_pointer: Phaser.Input.Pointer, _gameObjects: unknown[], _deltaX: number, deltaY: number) => {
-      const cam = this.cameras.main;
-      const newZoom = Phaser.Math.Clamp(cam.zoom + (deltaY > 0 ? -0.05 : 0.05), 0.4, 2.0);
+  private setupCamera(): void {
+    const cam = this.cameras.main;
+
+    // Start focused on the lower-left (pile area where the action begins)
+    cam.setZoom(1.0);
+    cam.centerOn(300, 850);
+
+    // Zoom with mouse wheel
+    this.input.on('wheel', (
+      _pointer: Phaser.Input.Pointer,
+      _gameObjects: unknown[],
+      _deltaX: number,
+      deltaY: number,
+    ) => {
+      const newZoom = Phaser.Math.Clamp(cam.zoom + (deltaY > 0 ? -0.05 : 0.05), 0.35, 2.0);
       cam.setZoom(newZoom);
     });
 
+    // Pan with middle mouse button drag or two-finger drag
+    let isPanning = false;
+    let panStartX = 0;
+    let panStartY = 0;
+    let camStartX = 0;
+    let camStartY = 0;
+
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      // Middle button or two-finger touch
+      if (pointer.middleButtonDown() || (this.input.pointer1.isDown && this.input.pointer2.isDown)) {
+        isPanning = true;
+        panStartX = pointer.x;
+        panStartY = pointer.y;
+        camStartX = cam.scrollX;
+        camStartY = cam.scrollY;
+      }
+    });
+
+    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
+      if (isPanning) {
+        const dx = (panStartX - pointer.x) / cam.zoom;
+        const dy = (panStartY - pointer.y) / cam.zoom;
+        cam.scrollX = camStartX + dx;
+        cam.scrollY = camStartY + dy;
+      }
+    });
+
+    this.input.on('pointerup', () => {
+      isPanning = false;
+    });
+
     // Pinch zoom for mobile
-    this.input.addPointer(1); // Enable second pointer
+    this.input.addPointer(1);
     let pinchDist = 0;
 
     this.input.on('pointerdown', () => {
       if (this.input.pointer1.isDown && this.input.pointer2.isDown) {
-        const p1 = this.input.pointer1;
-        const p2 = this.input.pointer2;
-        pinchDist = Phaser.Math.Distance.Between(p1.x, p1.y, p2.x, p2.y);
+        pinchDist = Phaser.Math.Distance.Between(
+          this.input.pointer1.x, this.input.pointer1.y,
+          this.input.pointer2.x, this.input.pointer2.y,
+        );
       }
     });
 
     this.input.on('pointermove', () => {
       if (this.input.pointer1.isDown && this.input.pointer2.isDown) {
-        const p1 = this.input.pointer1;
-        const p2 = this.input.pointer2;
-        const newDist = Phaser.Math.Distance.Between(p1.x, p1.y, p2.x, p2.y);
+        const newDist = Phaser.Math.Distance.Between(
+          this.input.pointer1.x, this.input.pointer1.y,
+          this.input.pointer2.x, this.input.pointer2.y,
+        );
         if (pinchDist > 0) {
-          const scale = newDist / pinchDist;
-          const cam = this.cameras.main;
-          cam.setZoom(Phaser.Math.Clamp(cam.zoom * scale, 0.4, 2.0));
+          cam.setZoom(Phaser.Math.Clamp(cam.zoom * (newDist / pinchDist), 0.35, 2.0));
         }
         pinchDist = newDist;
       }
