@@ -44,6 +44,8 @@
 
     "aluminum": {
       "label": "Aluminum",
+      "color": "0xC0C8D4",
+      "outlineColor": "0xDDE3EB",
       "density": 0.001,
       "restitution": 0.15,
       "friction": 0.4,
@@ -55,6 +57,8 @@
     },
     "steel": {
       "label": "Steel",
+      "color": "0x7088A0",
+      "outlineColor": "0x90A8C0",
       "density": 0.003,
       "restitution": 0.08,
       "friction": 0.6,
@@ -66,6 +70,8 @@
     },
     "lead": {
       "label": "Lead",
+      "color": "0x3B3B4F",
+      "outlineColor": "0x55556B",
       "density": 0.006,
       "restitution": 0.02,
       "friction": 0.8,
@@ -77,6 +83,8 @@
     },
     "rubber": {
       "label": "Rubber",
+      "color": "0x2D2D2D",
+      "outlineColor": "0x4A4A4A",
       "density": 0.0015,
       "restitution": 0.5,
       "friction": 0.9,
@@ -88,6 +96,8 @@
     },
     "concrete": {
       "label": "Concrete",
+      "color": "0x8A8878",
+      "outlineColor": "0xA8A696",
       "density": 0.004,
       "restitution": 0.03,
       "friction": 0.7,

@@ -62,6 +62,10 @@ export interface PieceDefinition {
  */
 export interface MaterialDefinition {
   label: string;
+  /** Fill color as hex string "0xRRGGBB" — parsed to number at runtime */
+  color: string;
+  /** Outline color as hex string "0xRRGGBB" */
+  outlineColor: string;
   density: number;
   restitution: number;
   friction: number;

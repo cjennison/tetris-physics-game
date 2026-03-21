@@ -55,7 +55,21 @@ export class PieceRenderer {
 
     for (const body of this.bodies) {
       const data = getPieceData(body);
-      const color = data?.color ?? 0xaaaaaa;
+
+      /**
+       * LEARN: Colors come from the material, not the piece shape.
+       * This way an I-Block made of lead looks dark and heavy, while
+       * the same shape in aluminum looks bright and light. The player
+       * reads the material at a glance from the color alone.
+       * Colors in tuning.json are hex strings ("0xC0C8D4") so they're
+       * human-readable; we parse them to numbers here.
+       */
+      const fillColor = data?.material
+        ? parseInt(data.material.color, 16)
+        : 0xaaaaaa;
+      const outlineColor = data?.material
+        ? parseInt(data.material.outlineColor, 16)
+        : 0xcccccc;
 
       // Determine which parts to draw
       const parts = body.parts.length > 1 ? body.parts.slice(1) : body.parts;
@@ -64,8 +78,8 @@ export class PieceRenderer {
         const verts = part.vertices;
         if (!verts || verts.length < 3) continue;
 
-        // Fill
-        this.graphics.fillStyle(color, 0.85);
+        // Fill with material color
+        this.graphics.fillStyle(fillColor, 0.9);
         this.graphics.beginPath();
         this.graphics.moveTo(verts[0]!.x, verts[0]!.y);
         for (let i = 1; i < verts.length; i++) {
@@ -74,8 +88,8 @@ export class PieceRenderer {
         this.graphics.closePath();
         this.graphics.fillPath();
 
-        // Outline for visual definition
-        this.graphics.lineStyle(1.5, 0xffffff, 0.3);
+        // Outline in material's outline color
+        this.graphics.lineStyle(1.5, outlineColor, 0.5);
         this.graphics.beginPath();
         this.graphics.moveTo(verts[0]!.x, verts[0]!.y);
         for (let i = 1; i < verts.length; i++) {
