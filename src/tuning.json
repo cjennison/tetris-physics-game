@@ -24,10 +24,10 @@
   "laser": {
     "bandHeight": 30,
     "coverageThreshold": 0.90,
-    "chargeMs": 3000,
+    "chargeTimes": [10000, 8000, 6000, 4000, 3000, 2000, 1500, 1000],
     "cooldownMs": 2000,
     "lineSpacing": 80,
-    "_doc": "chargeMs = how long the laser charges (visual bar left→right) before firing. Coverage must stay above threshold for the full charge duration."
+    "_doc": "chargeTimes = per-laser charge duration in ms, bottom-to-top. Bottom laser (index 0) charges slowest. If fewer values than lasers, last value is reused for remaining top lasers."
   },
 
   "settling": {

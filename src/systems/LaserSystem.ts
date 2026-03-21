@@ -41,6 +41,8 @@ interface LaserLine {
   chargeStartedAt: number | null;
   /** Charge progress 0-1 (fills left to right) */
   chargeProgress: number;
+  /** Per-laser charge duration in ms (bottom = slow, top = fast) */
+  chargeMs: number;
 }
 
 export class LaserSystem {
@@ -78,7 +80,29 @@ export class LaserSystem {
     const playHeight = floorY - railY;
     const spacing = playHeight / (laserCount + 1);
 
+    /**
+     * LEARN: Charge times scale by position — bottom lasers are slow,
+     * top lasers are fast. This creates a strategic gradient: it's easy
+     * to fill the bottom but hard to clear it (10s charge). The top is
+     * hard to reach but clears quickly (1-2s). Players must decide
+     * whether to build a solid base (slow clear) or stack high (fast
+     * clear but risky).
+     *
+     * Charge times are read from tuning.json as an array. If the array
+     * is shorter than laserCount, remaining lasers use the last value.
+     */
+    const chargeTimes: number[] = (TUNING.laser.chargeTimes as number[] | undefined)
+      ?? [10000, 8000, 6000, 4000, 3000, 2000, 1500, 1000];
+
     for (let i = 1; i <= laserCount; i++) {
+      // i=1 is top laser, i=laserCount is bottom laser
+      // We want bottom (high i) = slow charge, top (low i) = fast charge
+      // So index into chargeTimes from the bottom: bottom gets [0], top gets [last]
+      const bottomIndex = laserCount - i; // 0 for bottom, laserCount-1 for top
+      const chargeMs = chargeTimes[Math.min(bottomIndex, chargeTimes.length - 1)]
+        ?? chargeTimes[chargeTimes.length - 1]
+        ?? 3000;
+
       this.lasers.push({
         y: railY + spacing * i,
         coverage: 0,
@@ -86,6 +110,7 @@ export class LaserSystem {
         onCooldown: false,
         chargeStartedAt: null,
         chargeProgress: 0,
+        chargeMs,
       });
     }
   }
@@ -98,7 +123,6 @@ export class LaserSystem {
     const bandHeight = TUNING.laser.bandHeight;
     const threshold = TUNING.laser.coverageThreshold;
     const cooldownMs = TUNING.laser.cooldownMs;
-    const chargeMs = TUNING.laser.chargeMs ?? 3000;
     const now = Date.now();
 
     // Get all non-static piece bodies
@@ -131,7 +155,7 @@ export class LaserSystem {
         if (laser.chargeStartedAt === null) {
           laser.chargeStartedAt = now;
         }
-        laser.chargeProgress = Math.min(1, (now - laser.chargeStartedAt) / chargeMs);
+        laser.chargeProgress = Math.min(1, (now - laser.chargeStartedAt) / laser.chargeMs);
 
         // Fully charged — FIRE
         if (laser.chargeProgress >= 1) {
