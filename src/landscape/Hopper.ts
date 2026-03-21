@@ -13,11 +13,11 @@ import { PILE_LEFT, PILE_RIGHT } from '../config';
 import { Terrain } from './Terrain';
 
 /** Chute configuration */
-const CHUTE_EXIT_X = 120;   // Where pieces exit into the landscape
-const CHUTE_EXIT_Y = 380;   // Y of the exit point (well above terrain)
-const CHUTE_ANGLE = 0.45;   // Angle (radians) — gentler slope so pieces slide
-const CHUTE_LENGTH = 250;   // Ramp length (extends off-screen left)
-const CHUTE_WIDTH = 80;     // Width of the chute channel
+const CHUTE_EXIT_X = 70;    // Exits just past the wall
+const CHUTE_EXIT_Y = 220;   // High up — pieces fall a long way
+const CHUTE_ANGLE = 0.5;    // Steeper so pieces shoot out faster
+const CHUTE_LENGTH = 150;   // Short — mostly behind the wall
+const CHUTE_WIDTH = 80;     // Channel width
 /** Spawn point — top of the ramp, off-screen behind the left wall */
 const SPAWN_X = CHUTE_EXIT_X - Math.cos(CHUTE_ANGLE) * CHUTE_LENGTH;
 const SPAWN_Y = CHUTE_EXIT_Y - Math.sin(CHUTE_ANGLE) * CHUTE_LENGTH;
@@ -134,26 +134,26 @@ export class Hopper {
     const rampMidY = (SPAWN_Y + CHUTE_EXIT_Y) / 2;
     const perpOffset = CHUTE_WIDTH / 2;
 
-    // Bottom ramp (pieces slide on this)
+    // Bottom ramp — super slippery so even lead slides fast
     this.scene.matter.add.rectangle(
       rampMidX + Math.sin(CHUTE_ANGLE) * perpOffset,
       rampMidY - Math.cos(CHUTE_ANGLE) * perpOffset,
       CHUTE_LENGTH + 40, 10,
       {
         isStatic: true, angle: CHUTE_ANGLE,
-        label: 'chute-ramp-bottom', friction: 0.15,
+        label: 'chute-ramp-bottom', friction: 0.02, restitution: 0.05,
         collisionFilter: { category: 0x0001, mask: 0x0002 },
       },
     );
 
-    // Top wall (keeps pieces in the chute)
+    // Top wall (keeps pieces in the chute) — also slippery
     this.scene.matter.add.rectangle(
       rampMidX - Math.sin(CHUTE_ANGLE) * perpOffset,
       rampMidY + Math.cos(CHUTE_ANGLE) * perpOffset,
       CHUTE_LENGTH + 40, 10,
       {
         isStatic: true, angle: CHUTE_ANGLE,
-        label: 'chute-ramp-top', friction: 0.1,
+        label: 'chute-ramp-top', friction: 0.02,
         collisionFilter: { category: 0x0001, mask: 0x0002 },
       },
     );

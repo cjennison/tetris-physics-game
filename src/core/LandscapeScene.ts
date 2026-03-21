@@ -112,8 +112,8 @@ export class LandscapeScene extends Phaser.Scene {
      * off-screen and slide through this gap into the landscape. The wall
      * is split into two parts: above the chute and below the chute.
      */
-    const gapTop = 200;    // Top of chute opening — generous gap
-    const gapBottom = 430; // Bottom of chute opening
+    const gapTop = 100;    // Top of chute opening — high up
+    const gapBottom = 320; // Bottom of chute opening
 
     // Left wall visual (with gap)
     const g = this.add.graphics();
