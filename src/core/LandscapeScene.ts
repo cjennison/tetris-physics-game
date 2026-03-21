@@ -78,7 +78,7 @@ export class LandscapeScene extends Phaser.Scene {
 
     // Instructions
     this.add.text(LANDSCAPE_WIDTH / 2, LANDSCAPE_HEIGHT - 15,
-      '← → drive   |   SPACE = grab / drop', {
+      '← → drive   |   ↑↓ reel rope   |   SPACE = grab / drop', {
         fontSize: '11px', color: '#445566', fontFamily: 'monospace',
       }).setOrigin(0.5).setDepth(10);
 

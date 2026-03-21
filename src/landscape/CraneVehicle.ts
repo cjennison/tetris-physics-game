@@ -43,7 +43,12 @@ export class CraneVehicle {
 
   /** Hook — small dynamic body dangling from the arm tip via rope */
   private hook: MatterJS.BodyType;
-  private readonly ROPE_LENGTH = 60;
+  private ropeConstraint!: MatterJS.ConstraintType;
+  private ropeLength = 80; // Current rope length (adjustable)
+  private readonly ROPE_MIN = 15;
+  private readonly ROPE_MAX = 150;
+  private readonly ROPE_SPEED = 2; // Pixels per frame when reeling
+  private readonly ARM_HEIGHT = 70; // How tall the crane arm extends above chassis
 
   /** Carried piece — attached to hook via constraint */
   private carriedPiece: SpawnedPiece | null = null;
@@ -53,6 +58,8 @@ export class CraneVehicle {
   /** Input */
   private leftKey: Phaser.Input.Keyboard.Key | null = null;
   private rightKey: Phaser.Input.Keyboard.Key | null = null;
+  private upKey: Phaser.Input.Keyboard.Key | null = null;
+  private downKey: Phaser.Input.Keyboard.Key | null = null;
   private spaceJustPressed = false;
 
   /** Column delivery zones */
@@ -89,9 +96,9 @@ export class CraneVehicle {
     scene.matter.body.setInertia(this.chassis, 800);
 
     // Create hook — small circle dangling from arm
-    const armTipStartY = chassisY - VEHICLE_HEIGHT / 2 - 30;
+    const armTipStartY = chassisY - VEHICLE_HEIGHT / 2 - this.ARM_HEIGHT;
     this.hook = scene.matter.add.circle(
-      startX, armTipStartY + this.ROPE_LENGTH, 5,
+      startX, armTipStartY + this.ropeLength, 5,
       {
         label: 'vehicle-hook',
         density: 0.002,
@@ -103,14 +110,14 @@ export class CraneVehicle {
       },
     );
 
-    // Rope from arm tip to hook
-    scene.matter.add.constraint(
+    // Rope from arm tip to hook — length is adjustable via up/down keys
+    this.ropeConstraint = scene.matter.add.constraint(
       this.chassis,
       this.hook,
-      this.ROPE_LENGTH,
-      0.6, // Moderately stiff
+      this.ropeLength,
+      0.7,
       {
-        pointA: { x: 0, y: -(VEHICLE_HEIGHT / 2 + 30) },
+        pointA: { x: 0, y: -(VEHICLE_HEIGHT / 2 + this.ARM_HEIGHT) },
         damping: 0.02,
         label: 'vehicle-rope',
       },
@@ -125,9 +132,32 @@ export class CraneVehicle {
 
   update(): void {
     this.handleDriving();
+    this.handleRopeReel();
     this.handleAction();
     this.updateArmPosition();
     this.draw();
+  }
+
+  /**
+   * Reel the rope in/out with up/down arrows.
+   *
+   * LEARN: We change the constraint's `length` property each frame.
+   * Matter.js constraints are springs — shortening the length pulls
+   * the hook (and any attached piece) upward. Lengthening lets it
+   * drop down. This simulates a winch/reel on the crane arm.
+   */
+  private handleRopeReel(): void {
+    if (!this.upKey || !this.downKey) return;
+
+    if (this.upKey.isDown) {
+      this.ropeLength = Math.max(this.ROPE_MIN, this.ropeLength - this.ROPE_SPEED);
+    }
+    if (this.downKey.isDown) {
+      this.ropeLength = Math.min(this.ROPE_MAX, this.ropeLength + this.ROPE_SPEED);
+    }
+
+    // Update the constraint length
+    this.ropeConstraint.length = this.ropeLength;
   }
 
   private handleDriving(): void {
@@ -250,9 +280,12 @@ export class CraneVehicle {
   }
 
   private updateArmPosition(): void {
-    // Track arm tip position (follows chassis)
-    this.armTipX = this.chassis.position.x;
-    this.armTipY = this.chassis.position.y - VEHICLE_HEIGHT / 2 - 30;
+    // Track arm tip position (follows chassis, accounting for rotation)
+    const cos = Math.cos(this.chassis.angle);
+    const sin = Math.sin(this.chassis.angle);
+    const offsetY = -(VEHICLE_HEIGHT / 2 + this.ARM_HEIGHT);
+    this.armTipX = this.chassis.position.x + sin * -offsetY;
+    this.armTipY = this.chassis.position.y + cos * offsetY;
 
     // Clamp hook inside landscape
     if (this.hook.position.x < 10 || this.hook.position.x > LANDSCAPE_WIDTH - 10) {
@@ -267,6 +300,8 @@ export class CraneVehicle {
     if (!this.scene.input.keyboard) return;
     this.leftKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
     this.rightKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+    this.upKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+    this.downKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
     const spaceKey = this.scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     spaceKey.on('down', () => { this.spaceJustPressed = true; });
   }
