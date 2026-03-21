@@ -152,6 +152,16 @@ export class CraneSystem {
    * can't keep up with the trolley's quick starts.
    */
   update(actions: GameActions): void {
+    // If the attached piece was destroyed (e.g., glass shattered on wall),
+    // clean up the rope so the crane can accept a new piece
+    if (this.attachedBody && !this.scene.matter.world.getAllBodies().includes(this.attachedBody)) {
+      if (this.rope) {
+        this.scene.matter.world.removeConstraint(this.rope);
+        this.rope = null;
+      }
+      this.attachedBody = null;
+    }
+
     // Map normalized 0-1 to pixel coordinates within play area
     const targetX = this.playLeft + actions.horizontalTarget * (this.playRight - this.playLeft);
 

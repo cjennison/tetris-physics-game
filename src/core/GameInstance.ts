@@ -200,6 +200,14 @@ export class GameInstance extends Phaser.Scene {
     const actions = this.inputSystem.getActions();
     this.craneSystem.update(actions);
 
+    // If the piece shattered while on the rope (e.g., swung into a wall),
+    // the crane auto-detaches. Move straight to spawning the next piece.
+    if (!this.craneSystem.hasAttachedPiece()) {
+      this.activePiece = null;
+      this.setState('laser_check');
+      return;
+    }
+
     if (actions.drop) {
       const droppedBody = this.craneSystem.dropPiece();
       if (droppedBody) {
