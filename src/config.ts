@@ -27,7 +27,7 @@ export const PILE_LEFT = 30;
 export const PILE_RIGHT = 250;
 
 /** Processing column dimensions */
-export const COLUMN_HEIGHT = 350;
+export const COLUMN_HEIGHT = 250;
 
 /** Crane vehicle */
 export const VEHICLE_WIDTH = 50;
