@@ -220,6 +220,49 @@ export class CraneSystem {
     return this.trolleyX;
   }
 
+  /** Get the hook's current position */
+  getHookPosition(): { x: number; y: number } {
+    return { x: this.hook.position.x, y: this.hook.position.y };
+  }
+
+  /**
+   * Check if the area around the hook is clear enough to spawn a piece.
+   *
+   * LEARN: We use a bounding-box overlap check against all dynamic piece
+   * bodies. The "spawn zone" is a generous rectangle around the hook —
+   * roughly the size of the largest piece. If ANY piece body's bounding
+   * box overlaps this zone, it's not safe to spawn.
+   *
+   * This runs every frame while in the SPAWNING state, so the game
+   * naturally waits for debris to clear before spawning the next piece.
+   */
+  isHookAreaClear(): boolean {
+    const hookPos = this.hook.position;
+    const margin = 60; // Half-width of spawn safety zone
+    const spawnZone = {
+      minX: hookPos.x - margin,
+      maxX: hookPos.x + margin,
+      minY: hookPos.y - margin,
+      maxY: hookPos.y + margin,
+    };
+
+    const bodies = this.scene.matter.world.getAllBodies();
+    for (const body of bodies) {
+      if (body.isStatic) continue;
+      if (body === this.hook || body === this.trolley) continue;
+      if (!body.label?.startsWith('piece-')) continue;
+
+      // AABB overlap check
+      if (body.bounds.max.x > spawnZone.minX &&
+          body.bounds.min.x < spawnZone.maxX &&
+          body.bounds.max.y > spawnZone.minY &&
+          body.bounds.min.y < spawnZone.maxY) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   /** Draw the crane trolley, rail, rope, and hook */
   private draw(): void {
     this.graphics.clear();

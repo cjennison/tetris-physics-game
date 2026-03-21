@@ -167,8 +167,31 @@ export class GameInstance extends Phaser.Scene {
     this.stateText.setText(this.state.toUpperCase());
   }
 
-  /** SPAWNING: Create a new piece and attach it to the crane */
+  /**
+   * SPAWNING: Wait for the hook area to be clear, then create a new piece.
+   *
+   * LEARN: After a shatter (especially wall-smash), debris may be flying
+   * near the crane hook. If we spawn a piece immediately, it overlaps
+   * with the debris and can trigger another shatter. Instead, we check
+   * every frame: "is the hook area clear?" If not, we keep the crane
+   * swinging empty and wait. The hook keeps swinging naturally, and the
+   * player sees the rope moving without a piece — visual feedback that
+   * the game is waiting for space to clear.
+   */
   private handleSpawning(): void {
+    // Keep the crane moving even while waiting to spawn
+    const actions = this.inputSystem.getActions();
+    if (this.testCraneTarget !== null && this.testCraneTarget >= 0) {
+      actions.horizontalTarget = this.testCraneTarget;
+    }
+    this.craneSystem.update(actions);
+
+    // Wait until the hook area is clear
+    if (!this.craneSystem.isHookAreaClear()) {
+      this.stateText.setText('WAITING...');
+      return;
+    }
+
     const spawned = this.pieceFactory.spawnPiece(
       this.boardConfig.width / 2,
       TUNING.crane.railY + 50,
@@ -179,7 +202,6 @@ export class GameInstance extends Phaser.Scene {
     this.craneSystem.attachPiece(spawned.body, spawned.material);
     this.settleCounter = 0;
 
-    // Show material label so the player knows what they're working with
     this.materialText.setText(`${spawned.material.label} ${spawned.definition.name}`);
 
     this.events.emit(EventBus.PIECE_SPAWNED, {
