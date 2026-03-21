@@ -23,6 +23,7 @@ import {
   LANDSCAPE_WIDTH,
 } from '../config';
 import { Terrain } from './Terrain';
+import { TouchControls } from '../ui/TouchControls';
 
 const VEHICLE_CATEGORY = 0x0010;
 const WHEEL_RADIUS = 10;
@@ -64,6 +65,7 @@ export class CraneVehicle {
   private downKey: Phaser.Input.Keyboard.Key | null = null;
   private shiftKey: Phaser.Input.Keyboard.Key | null = null;
   private spaceJustPressed = false;
+  private touchControls: TouchControls;
 
   /** Column zones */
   private columnZones: Array<{
@@ -153,6 +155,7 @@ export class CraneVehicle {
       { damping: 0.02, label: 'vehicle-rope' },
     );
 
+    this.touchControls = new TouchControls();
     this.setupInput();
   }
 
@@ -161,29 +164,24 @@ export class CraneVehicle {
   }
 
   update(): void {
-    this.handleDriving();
-    this.handleBoom();
-    this.handleRope();
-    this.handleAction();
+    const touch = this.touchControls.getState();
+    this.handleDriving(touch);
+    this.handleBoom(touch);
+    this.handleRope(touch);
+    this.handleAction(touch);
     this.updateBoomTip();
     this.draw();
   }
 
-  private handleDriving(): void {
-    if (!this.leftKey || !this.rightKey) return;
-
-    /**
-     * LEARN: Instead of applying force to the chassis, we spin the wheels
-     * by setting their angular velocity. This is like a motor — the wheels
-     * push against the terrain via friction and the vehicle moves. This
-     * works much better on slopes than chassis-force because the wheels
-     * grip the terrain surface regardless of angle.
-     */
+  private handleDriving(touch: { driveLeft: boolean; driveRight: boolean }): void {
     const speed = VEHICLE_SPEED * 0.08;
-    if (this.leftKey.isDown) {
+    const left = this.leftKey?.isDown || touch.driveLeft;
+    const right = this.rightKey?.isDown || touch.driveRight;
+
+    if (left) {
       this.scene.matter.body.setAngularVelocity(this.wheelRear, -speed);
       this.scene.matter.body.setAngularVelocity(this.wheelFront, -speed);
-    } else if (this.rightKey.isDown) {
+    } else if (right) {
       this.scene.matter.body.setAngularVelocity(this.wheelRear, speed);
       this.scene.matter.body.setAngularVelocity(this.wheelFront, speed);
     }
@@ -198,24 +196,25 @@ export class CraneVehicle {
     }
   }
 
-  private handleBoom(): void {
-    if (!this.upKey || !this.downKey || !this.shiftKey) return;
-    if (this.shiftKey.isDown) return;
-    if (this.upKey.isDown) this.boomAngle = Math.max(this.BOOM_MIN_ANGLE, this.boomAngle - this.BOOM_SPEED);
-    if (this.downKey.isDown) this.boomAngle = Math.min(this.BOOM_MAX_ANGLE, this.boomAngle + this.BOOM_SPEED);
+  private handleBoom(touch: { boomUp: boolean; boomDown: boolean }): void {
+    const kbBoomUp = this.upKey?.isDown && !this.shiftKey?.isDown;
+    const kbBoomDown = this.downKey?.isDown && !this.shiftKey?.isDown;
+    if (kbBoomUp || touch.boomUp) this.boomAngle = Math.max(this.BOOM_MIN_ANGLE, this.boomAngle - this.BOOM_SPEED);
+    if (kbBoomDown || touch.boomDown) this.boomAngle = Math.min(this.BOOM_MAX_ANGLE, this.boomAngle + this.BOOM_SPEED);
   }
 
-  private handleRope(): void {
-    if (!this.upKey || !this.downKey || !this.shiftKey) return;
-    if (!this.shiftKey.isDown) return;
-    if (this.upKey.isDown) this.ropeLength = Math.max(this.ROPE_MIN, this.ropeLength - this.ROPE_SPEED);
-    if (this.downKey.isDown) this.ropeLength = Math.min(this.ROPE_MAX, this.ropeLength + this.ROPE_SPEED);
+  private handleRope(touch: { ropeIn: boolean; ropeOut: boolean }): void {
+    const kbRopeIn = this.upKey?.isDown && this.shiftKey?.isDown;
+    const kbRopeOut = this.downKey?.isDown && this.shiftKey?.isDown;
+    if (kbRopeIn || touch.ropeIn) this.ropeLength = Math.max(this.ROPE_MIN, this.ropeLength - this.ROPE_SPEED);
+    if (kbRopeOut || touch.ropeOut) this.ropeLength = Math.min(this.ROPE_MAX, this.ropeLength + this.ROPE_SPEED);
     this.ropeConstraint.length = this.ropeLength;
   }
 
-  private handleAction(): void {
-    if (!this.spaceJustPressed) return;
+  private handleAction(touch: { grab: boolean }): void {
+    const actionPressed = this.spaceJustPressed || touch.grab;
     this.spaceJustPressed = false;
+    if (!actionPressed) return;
 
     if (!this.carriedPiece) {
       const hookPos = this.hook.position;
