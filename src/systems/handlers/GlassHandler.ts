@@ -79,25 +79,41 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
     return [];
   }
 
-  const bodyParts = info.body.parts.length > 1
+  /**
+   * LEARN: Matter.js decomposes concave shapes (like T-Block, L-Block)
+   * into multiple small convex sub-parts. If we fracture each sub-part
+   * individually, the pieces are too small to produce viable fragments.
+   *
+   * Instead, we collect ALL vertices from ALL sub-parts and compute
+   * their convex hull — this gives us the full outer boundary of the
+   * piece as a single polygon. Then we fracture THAT. This works for
+   * both simple bodies (I-Block, O-Block) and compound bodies (T, S, Z, L, J).
+   */
+  const allVerts: Array<{ x: number; y: number }> = [];
+  const parts = info.body.parts.length > 1
     ? info.body.parts.slice(1)
     : [info.body];
+  for (const part of parts) {
+    if (!part.vertices) continue;
+    for (const v of part.vertices) {
+      allVerts.push({ x: v.x, y: v.y });
+    }
+  }
+
+  const hullVerts = convexHull(allVerts);
+  if (hullVerts.length < 3) return [];
+
+  // Generate fragment polygons by radial cutting the full shape
+  const fragments = radialFracture(
+    hullVerts,
+    info.contactPoint,
+    config.fractureCuts,
+    config.minShardArea,
+  );
 
   const allFragments: MatterJS.BodyType[] = [];
 
-  for (const part of bodyParts) {
-    const partVerts = part.vertices;
-    if (!partVerts) continue;
-    const worldVerts = partVerts.map(v => ({ x: v.x, y: v.y }));
-    if (worldVerts.length < 3) continue;
-
-    // Generate fragment polygons by radial cutting
-    const fragments = radialFracture(
-      worldVerts,
-      info.contactPoint,
-      config.fractureCuts,
-      config.minShardArea,
-    );
+  {
 
     /**
      * LEARN: The #1 cause of physics "freakouts" is overlapping bodies.
@@ -353,4 +369,55 @@ function polygonCentroid(verts: Array<{ x: number; y: number }>): { x: number; y
 function estimateBodyArea(body: MatterJS.BodyType): number {
   const bounds = body.bounds;
   return (bounds.max.x - bounds.min.x) * (bounds.max.y - bounds.min.y);
+}
+
+/**
+ * Convex hull using the Gift Wrapping (Jarvis March) algorithm.
+ *
+ * LEARN: A convex hull is the smallest convex polygon that contains
+ * all given points — like stretching a rubber band around pushpins.
+ * We need this because compound Matter.js bodies (concave shapes like
+ * T-Block) are split into multiple convex parts. To fracture the whole
+ * shape, we need its outer boundary as a single polygon.
+ */
+function convexHull(points: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> {
+  if (points.length < 3) return points;
+
+  // Find the leftmost point (guaranteed to be on the hull)
+  let start = 0;
+  for (let i = 1; i < points.length; i++) {
+    if (points[i]!.x < points[start]!.x ||
+        (points[i]!.x === points[start]!.x && points[i]!.y < points[start]!.y)) {
+      start = i;
+    }
+  }
+
+  const hull: Array<{ x: number; y: number }> = [];
+  let current = start;
+
+  do {
+    hull.push(points[current]!);
+    let next = 0;
+
+    for (let i = 0; i < points.length; i++) {
+      if (i === current) continue;
+      if (next === current) {
+        next = i;
+        continue;
+      }
+
+      // Cross product to determine turn direction
+      const cross =
+        (points[i]!.x - points[current]!.x) * (points[next]!.y - points[current]!.y) -
+        (points[i]!.y - points[current]!.y) * (points[next]!.x - points[current]!.x);
+
+      if (cross < 0) {
+        next = i;
+      }
+    }
+
+    current = next;
+  } while (current !== start && hull.length < points.length);
+
+  return hull;
 }
