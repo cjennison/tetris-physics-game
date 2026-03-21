@@ -56,14 +56,22 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
   const config = getGlassConfig();
 
   /**
-   * LEARN: We check the RELATIVE speed between the two colliding bodies.
-   * This handles both cases:
-   * - Glass piece dropped onto floor (glass is moving fast)
-   * - Another piece dropped onto a stationary glass shard (other body moving)
-   *
-   * Without checking both, a settled glass shard would never break when
-   * hit by a falling piece, because the shard's own velocity is ~0.
+   * LEARN: Shards must NOT shatter further. Without this guard, a single
+   * glass piece hitting a wall creates shards that collide with each other
+   * and the wall, each triggering more shatters — exponential explosion.
+   * Only original whole glass pieces (not shards) should shatter.
    */
+  if (info.data.name === 'Glass-shard') {
+    return [];
+  }
+
+  // Global shard cap — prevent physics meltdown if something goes wrong
+  const existingShards = scene.matter.world.getAllBodies()
+    .filter(b => b.label === 'piece-Glass-shard').length;
+  if (existingShards > 50) {
+    return [];
+  }
+
   const velA = info.body.velocity;
   const velB = info.otherBody.velocity;
   const relVx = velA.x - velB.x;
@@ -73,7 +81,6 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
     return [];
   }
 
-  // Check if the piece is too small to shatter further
   const bodyArea = estimateBodyArea(info.body);
   if (bodyArea < config.unbreakableArea) {
     return [];
