@@ -70,6 +70,8 @@ export interface MaterialDefinition {
   restitution: number;
   friction: number;
   frictionStatic: number;
+  /** Air resistance — slows pieces during fall and reduces spinning */
+  frictionAir: number;
   /** Overrides crane rope stiffness for this material */
   ropeStiffness: number;
   /** Overrides crane rope damping for this material */

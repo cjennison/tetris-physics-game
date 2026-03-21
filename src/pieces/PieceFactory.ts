@@ -154,6 +154,7 @@ export class PieceFactory {
         restitution: material.restitution,
         friction: material.friction,
         frictionStatic: material.frictionStatic,
+        frictionAir: material.frictionAir ?? 0.01,
         density: material.density,
         collisionFilter: {
           category: CollisionCategory.PIECE,
