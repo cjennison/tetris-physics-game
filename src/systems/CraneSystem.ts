@@ -206,6 +206,21 @@ export class CraneSystem {
     });
     this.scene.matter.body.setVelocity(this.trolley, { x: 0, y: 0 });
 
+    // Hard-clamp hook inside walls — constraints can yank it through
+    // during fast trolley movement before physics resolves the collision
+    const hookX = this.hook.position.x;
+    if (hookX < this.playLeft + 5 || hookX > this.playRight - 5) {
+      this.scene.matter.body.setPosition(this.hook, {
+        x: Phaser.Math.Clamp(hookX, this.playLeft + 5, this.playRight - 5),
+        y: this.hook.position.y,
+      });
+      // Kill horizontal velocity so it doesn't keep pushing out
+      this.scene.matter.body.setVelocity(this.hook, {
+        x: -this.hook.velocity.x * 0.3, // Slight bounce back
+        y: this.hook.velocity.y,
+      });
+    }
+
     // Redraw visuals
     this.draw();
   }
