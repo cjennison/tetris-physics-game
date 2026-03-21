@@ -215,16 +215,18 @@ export class GameInstance extends Phaser.Scene {
     const actions = this.inputSystem.getActions();
     this.craneSystem.update(actions);
 
-    if (!this.activePiece) {
-      this.setState('spawning');
+    if (!this.activePiece || this.isBodyDestroyed(this.activePiece.body)) {
+      /**
+       * LEARN: If the active piece body was destroyed (e.g., glass shattered
+       * on impact), we skip straight to spawning. The shards are independent
+       * bodies now — the "active piece" no longer exists. Without this check,
+       * the state machine would stall reading velocity from a dead body.
+       */
+      this.activePiece = null;
+      this.setState('laser_check');
       return;
     }
 
-    /**
-     * LEARN: We check speed (magnitude of velocity vector) rather than
-     * individual x/y components. A piece sliding sideways at high speed
-     * shouldn't count as "settled" even if its Y velocity is low.
-     */
     const vel = this.activePiece.body.velocity;
     const speed = Math.sqrt(vel.x * vel.x + vel.y * vel.y);
 
@@ -241,8 +243,9 @@ export class GameInstance extends Phaser.Scene {
     const actions = this.inputSystem.getActions();
     this.craneSystem.update(actions);
 
-    if (!this.activePiece) {
-      this.setState('spawning');
+    if (!this.activePiece || this.isBodyDestroyed(this.activePiece.body)) {
+      this.activePiece = null;
+      this.setState('laser_check');
       return;
     }
 
@@ -266,6 +269,11 @@ export class GameInstance extends Phaser.Scene {
       this.settleCounter = 0;
       this.setState('dropping');
     }
+  }
+
+  /** Check if a body has been removed from the physics world (e.g., glass shattered) */
+  private isBodyDestroyed(body: MatterJS.BodyType): boolean {
+    return !this.matter.world.getAllBodies().includes(body);
   }
 
   /**

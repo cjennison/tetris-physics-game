@@ -144,10 +144,10 @@ export const glassCollisionHandler: MaterialCollisionHandler = (
           {
             label: 'piece-Glass-shard',
             restitution: 0.05,
-            friction: 0.5,
-            frictionStatic: 0.6,
-            frictionAir: 0.03,  // Air drag — fragments slow down quickly
-            density: info.data.material.density * 0.8,
+            friction: 0.8,
+            frictionStatic: 1.0,
+            frictionAir: 0.08,  // High air drag — shards settle fast
+            density: info.data.material.density,
             slop: 0.1,          // Tolerate small overlaps without jitter
             collisionFilter: {
               category: CollisionCategory.PIECE,
