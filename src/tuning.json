@@ -105,7 +105,11 @@
       "ropeStiffness": 0.92,
       "ropeDamping": 0.01,
       "weight": 7,
-      "_feel": "Heavy and rough — minimal swing, doesn't slide, solid foundation piece"
+      "special": "concrete",
+      "crackSpeedThreshold": 4.0,
+      "uncrackableArea": 800,
+      "minFragmentArea": 300,
+      "_feel": "Heavy and rough — CRACKS in half on hard impact from the point of collision. Halves can crack again if hit hard enough. Tougher than glass."
     },
     "glass": {
       "label": "Glass",

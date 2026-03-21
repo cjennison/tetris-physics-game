@@ -28,6 +28,7 @@ import { InputSystem } from '../systems/InputSystem';
 import { PieceRenderer } from '../systems/PieceRenderer';
 import { SpecialMaterialSystem } from '../systems/SpecialMaterialSystem';
 import { glassCollisionHandler } from '../systems/handlers/GlassHandler';
+import { concreteCollisionHandler } from '../systems/handlers/ConcreteHandler';
 import { PieceFactory, type SpawnedPiece } from '../pieces/PieceFactory';
 import { DevConsole } from '../ui/DevConsole';
 import { TUNING } from '../tuning';
@@ -104,6 +105,7 @@ export class GameInstance extends Phaser.Scene {
      */
     this.specialMaterials = new SpecialMaterialSystem(this, this.pieceRenderer);
     this.specialMaterials.registerHandler('glass', glassCollisionHandler);
+    this.specialMaterials.registerHandler('concrete', concreteCollisionHandler);
 
     // Status display
     this.stateText = this.add.text(this.boardConfig.width / 2, 15, '', {
