@@ -221,23 +221,33 @@ export class LaserSystem {
         if (!part.vertices || part.vertices.length < 3) continue;
         const verts = part.vertices.map((v: { x: number; y: number }) => ({ x: v.x, y: v.y }));
 
-        // Split at bandTop — horizontal line, normal pointing down (0, 1)
-        const [above, below] = splitPolygon(verts, { x: 0, y: bandTop }, 0, 1);
+        /**
+         * LEARN: splitPolygon divides a polygon by a line with a normal.
+         * Normal (0, -1) points UP, so:
+         *   "left"  = points where (point.y - lineY) * -1 >= 0 → y <= lineY → ABOVE
+         *   "right" = points where (point.y - lineY) * -1 < 0  → y > lineY  → BELOW
+         *
+         * First cut at bandTop: splits into [above_band, below_bandTop]
+         * Second cut at bandBottom: splits below_bandTop into [inside_band, below_band]
+         */
 
-        // Keep anything fully above the band
+        // Cut 1: split at bandTop — normal pointing UP
+        const [above, belowTop] = splitPolygon(verts, { x: 0, y: bandTop }, 0, -1);
+
+        // Keep the portion above the band
         if (above.length >= 3 && polygonArea(above) >= MIN_FRAGMENT_AREA) {
           survivors.push({ verts: above, center: polygonCentroid(above) });
         }
 
-        // Split the below portion at bandBottom
-        if (below.length >= 3) {
-          const [middle, bottom] = splitPolygon(below, { x: 0, y: bandBottom }, 0, 1);
-          // middle = inside band = destroyed (we just don't keep it)
-          void middle;
+        // Cut 2: split the below-top portion at bandBottom
+        if (belowTop.length >= 3) {
+          const [insideBand, belowBand] = splitPolygon(belowTop, { x: 0, y: bandBottom }, 0, -1);
+          // insideBand = the portion between bandTop and bandBottom = DESTROYED
+          void insideBand;
 
-          // Keep anything below the band
-          if (bottom.length >= 3 && polygonArea(bottom) >= MIN_FRAGMENT_AREA) {
-            survivors.push({ verts: bottom, center: polygonCentroid(bottom) });
+          // Keep the portion below the band
+          if (belowBand.length >= 3 && polygonArea(belowBand) >= MIN_FRAGMENT_AREA) {
+            survivors.push({ verts: belowBand, center: polygonCentroid(belowBand) });
           }
         }
       }
