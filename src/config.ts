@@ -50,15 +50,7 @@ export function createGameConfig(parent: string): Phaser.Types.Core.GameConfig {
       matter: {
         gravity: { x: 0, y: GRAVITY_Y },
         debug: false,
-        /**
-         * LEARN: Sleeping lets bodies that haven't moved "go to sleep."
-         * Sleeping bodies use zero CPU and don't react to small forces.
-         * They only wake up when something fast/heavy hits them directly.
-         * This is why the bottom of a stack stays rock-solid when you
-         * drop something on top — the bottom pieces are asleep and the
-         * impact isn't strong enough to wake them through 5 layers.
-         */
-        enableSleeping: true,
+        enableSleeping: false,
         /**
          * LEARN: positionIterations and velocityIterations control how
          * many times per frame the physics engine resolves overlaps and

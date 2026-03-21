@@ -79,19 +79,6 @@ export class GameInstance extends Phaser.Scene {
       this.boardConfig.height,
     );
 
-    /**
-     * LEARN: The sleep threshold controls how quickly bodies "go to sleep."
-     * A lower value means bodies sleep sooner after stopping. Sleeping
-     * bodies are immovable until hit hard enough to wake them. This is
-     * what makes the bottom of a stack feel solid — those pieces are
-     * asleep and won't budge from a gentle impact at the top.
-     *
-     * sleepThreshold is in frames of low motion (default 60). We lower
-     * it to 30 so pieces lock in place faster after settling.
-     */
-    // @ts-expect-error -- Matter engine options not fully typed in Phaser
-    this.matter.world.engine.sleepThreshold = 30;
-
     // Create boundary walls
     this.createWalls();
 
