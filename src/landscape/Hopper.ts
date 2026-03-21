@@ -13,7 +13,8 @@
 import Phaser from 'phaser';
 import { PieceFactory, type SpawnedPiece, getPieceData } from '../pieces/PieceFactory';
 import { PieceRenderer } from '../systems/PieceRenderer';
-import { PIPE_X, PIPE_Y, PIPE_WIDTH, PILE_LEFT, PILE_RIGHT, GROUND_Y } from '../config';
+import { PIPE_X, PIPE_Y, PIPE_WIDTH, PILE_LEFT, PILE_RIGHT } from '../config';
+import { Terrain } from './Terrain';
 
 export interface HopperConfig {
   /** Seconds between new piece spawns */
@@ -39,7 +40,7 @@ export class Hopper {
 
     this.drawPipe();
 
-    this.countText = scene.add.text(PIPE_X, GROUND_Y - 10, '', {
+    this.countText = scene.add.text(PIPE_X, Terrain.getHeightAt(PIPE_X) - 10, '', {
       fontSize: '11px', color: '#ff8844', fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(10);
   }
@@ -70,7 +71,7 @@ export class Hopper {
 
       // Check if this piece is in the pile zone
       if (body.position.x >= PILE_LEFT && body.position.x <= PILE_RIGHT &&
-          body.position.y < GROUND_Y) {
+          body.position.y < Terrain.getHeightAt(PIPE_X)) {
         if (body.position.y < topY) {
           topY = body.position.y;
           topmost = body;
@@ -104,7 +105,7 @@ export class Hopper {
       if (body.isStatic) continue;
       if (!body.label?.startsWith('piece-')) continue;
       if (body.position.x >= PILE_LEFT && body.position.x <= PILE_RIGHT &&
-          body.position.y < GROUND_Y) {
+          body.position.y < Terrain.getHeightAt(PIPE_X)) {
         count++;
       }
     }

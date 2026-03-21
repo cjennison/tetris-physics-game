@@ -22,7 +22,7 @@ import { glassCollisionHandler } from '../systems/handlers/GlassHandler';
 import { concreteCollisionHandler } from '../systems/handlers/ConcreteHandler';
 import { LaserSystem } from '../systems/LaserSystem';
 import { type SpawnedPiece } from '../pieces/PieceFactory';
-import { WALL_THICKNESS, GROUND_Y } from '../config';
+import { WALL_THICKNESS } from '../config';
 
 export interface ColumnConfig {
   id: string;
@@ -79,7 +79,7 @@ export class ProcessingColumn {
     }).setOrigin(0.5).setDepth(10);
 
     // Column label above the opening
-    this.scene.add.text(cx, GROUND_Y - 15, this.config.id.toUpperCase(), {
+    this.scene.add.text(cx, this.config.originY - 15, this.config.id.toUpperCase(), {
       fontSize: '10px', color: '#556677', fontFamily: 'monospace',
     }).setOrigin(0.5).setDepth(10);
 
