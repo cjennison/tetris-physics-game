@@ -1,0 +1,310 @@
+/**
+ * GlassHandler — Shatters glass pieces on impact
+ *
+ * LEARN: This is one of the most satisfying effects in physics games.
+ * When a glass piece hits something hard enough, it fractures into
+ * random shards that scatter based on the collision geometry.
+ *
+ * The algorithm: "Radial Fracture"
+ * 1. Find the collision point on the piece
+ * 2. Cast N random lines through/near that point at different angles
+ * 3. Each line splits the piece polygon into smaller fragments
+ * 4. Remove the original body, create new bodies for each fragment
+ * 5. Apply outward velocity from the impact point
+ *
+ * This looks convincing because real glass fractures radially from
+ * the impact point — cracks spread outward in a starburst pattern.
+ *
+ * The key insight: if a long glass piece lands on a point, the
+ * collision point is at that tip. Fracture lines radiate FROM that
+ * point, so the two halves naturally fall to either side. This is
+ * exactly the behavior you described wanting.
+ */
+import Phaser from 'phaser';
+import { CollisionCategory } from '../../types';
+import { type PieceUserData } from '../../pieces/PieceFactory';
+import { PieceRenderer } from '../PieceRenderer';
+import type { CollisionInfo, MaterialCollisionHandler } from '../SpecialMaterialSystem';
+import { TUNING } from '../../tuning';
+
+/** Tuning for glass shatter — read from tuning.json */
+function getGlassConfig() {
+  const glass = TUNING.materials.glass as Record<string, unknown>;
+  return {
+    /** Minimum impact force to trigger shatter */
+    shatterThreshold: (glass?.shatterThreshold as number) ?? 1.5,
+    /** Number of fracture lines to cast */
+    fractureCuts: (glass?.fractureCuts as number) ?? 3,
+    /** How fast fragments scatter outward */
+    scatterForce: (glass?.scatterForce as number) ?? 2.0,
+    /** Minimum fragment area (discard tiny shards) */
+    minShardArea: (glass?.minShardArea as number) ?? 150,
+  };
+}
+
+/**
+ * The main handler — registered with SpecialMaterialSystem.
+ * Returns new fragment bodies (or empty array if impact too weak).
+ */
+export const glassCollisionHandler: MaterialCollisionHandler = (
+  info: CollisionInfo,
+  scene: Phaser.Scene,
+  renderer: PieceRenderer,
+): MatterJS.BodyType[] => {
+  const config = getGlassConfig();
+
+  // Only shatter on hard enough impacts
+  if (info.impactForce < config.shatterThreshold) {
+    return [];
+  }
+
+  /**
+   * LEARN: We get the piece's current world-space vertices from the
+   * Matter.js body. For compound bodies (concave shapes decomposed into
+   * convex parts), we take the vertices of the parent body (parts[0]).
+   * These represent the actual polygon shape in world coordinates,
+   * accounting for position and rotation.
+   */
+  const bodyParts = info.body.parts.length > 1
+    ? info.body.parts.slice(1)
+    : [info.body];
+
+  const allFragments: MatterJS.BodyType[] = [];
+
+  for (const part of bodyParts) {
+    const partVerts = part.vertices;
+    if (!partVerts) continue;
+    const worldVerts = partVerts.map(v => ({ x: v.x, y: v.y }));
+    if (worldVerts.length < 3) continue;
+
+    // Generate fragment polygons by radial cutting
+    const fragments = radialFracture(
+      worldVerts,
+      info.contactPoint,
+      config.fractureCuts,
+      config.minShardArea,
+    );
+
+    // Create physics bodies from fragments
+    for (const fragVerts of fragments) {
+      const center = polygonCentroid(fragVerts);
+      const area = polygonArea(fragVerts);
+      if (area < config.minShardArea) continue;
+
+      // Convert to local coordinates (relative to centroid)
+      const localVerts = fragVerts.map(v => ({
+        x: v.x - center.x,
+        y: v.y - center.y,
+      }));
+
+      try {
+        const fragBody = scene.matter.add.fromVertices(
+          center.x,
+          center.y,
+          [localVerts],
+          {
+            label: 'piece-Glass-shard',
+            restitution: 0.05,
+            friction: 0.3,
+            frictionStatic: 0.4,
+            density: info.data.material.density * 0.8,
+            collisionFilter: {
+              category: CollisionCategory.PIECE,
+              mask: CollisionCategory.WALL | CollisionCategory.PIECE,
+            },
+          },
+          true,
+        );
+
+        // Attach game data so renderer can color the shard
+        (fragBody as MatterJS.BodyType & { gameData: PieceUserData }).gameData = {
+          ...info.data,
+          name: 'Glass-shard',
+          settled: false,
+        };
+
+        /**
+         * LEARN: Scatter velocity is calculated from the vector between
+         * the collision point and the fragment's center. Fragments further
+         * from the impact get less force (inverse-ish relationship).
+         * This creates a natural "explosion" radiating from the impact.
+         */
+        const dx = center.x - info.contactPoint.x;
+        const dy = center.y - info.contactPoint.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const scatter = config.scatterForce / Math.max(dist * 0.02, 0.5);
+
+        scene.matter.body.setVelocity(fragBody, {
+          x: (dx / dist) * scatter + info.body.velocity.x * 0.3,
+          y: (dy / dist) * scatter + info.body.velocity.y * 0.3,
+        });
+
+        // Small random spin for visual flair
+        scene.matter.body.setAngularVelocity(
+          fragBody,
+          (Math.random() - 0.5) * 0.1,
+        );
+
+        allFragments.push(fragBody);
+      } catch {
+        // fromVertices can fail on degenerate polygons — skip silently
+      }
+    }
+  }
+
+  // Only destroy original if we successfully created fragments
+  if (allFragments.length > 0) {
+    renderer.removeBody(info.body);
+    scene.matter.world.remove(info.body);
+  }
+
+  return allFragments;
+};
+
+/**
+ * Radial fracture: split a polygon by casting lines through a point.
+ *
+ * LEARN: This is a simplified version of Voronoi fracture. True Voronoi
+ * gives the most natural-looking breaks, but it requires a Voronoi library.
+ * Radial cuts give a convincing "starburst" pattern that looks like glass
+ * cracking from the impact point, and it's simple to implement.
+ *
+ * Algorithm:
+ * 1. Pick N random angles
+ * 2. For each angle, define a line through the contact point
+ * 3. Split the polygon along that line using Sutherland-Hodgman clipping
+ * 4. Each split produces two halves; recursively split the halves
+ */
+function radialFracture(
+  vertices: Array<{ x: number; y: number }>,
+  contactPoint: { x: number; y: number },
+  numCuts: number,
+  minArea: number,
+): Array<Array<{ x: number; y: number }>> {
+  // Generate random angles, spread across 180 degrees for variety
+  const angles: number[] = [];
+  const baseAngle = Math.random() * Math.PI;
+  for (let i = 0; i < numCuts; i++) {
+    // Spread cuts across the full circle with some randomness
+    angles.push(baseAngle + (i * Math.PI) / numCuts + (Math.random() - 0.5) * 0.4);
+  }
+
+  // Start with the full polygon as the only fragment
+  let fragments: Array<Array<{ x: number; y: number }>> = [vertices];
+
+  // Each cut splits existing fragments
+  for (const angle of angles) {
+    const nx = Math.cos(angle);
+    const ny = Math.sin(angle);
+
+    const newFragments: Array<Array<{ x: number; y: number }>> = [];
+
+    for (const frag of fragments) {
+      const [left, right] = splitPolygon(frag, contactPoint, nx, ny);
+
+      if (left.length >= 3 && polygonArea(left) >= minArea) {
+        newFragments.push(left);
+      }
+      if (right.length >= 3 && polygonArea(right) >= minArea) {
+        newFragments.push(right);
+      }
+    }
+
+    fragments = newFragments.length > 0 ? newFragments : fragments;
+  }
+
+  return fragments;
+}
+
+/**
+ * Split a polygon by a line through a point with a given normal.
+ *
+ * LEARN: This uses the Sutherland-Hodgman algorithm, adapted for splitting.
+ * A line divides the plane into two half-planes (left and right of the line).
+ * We walk the polygon edges, putting vertices into the "left" or "right"
+ * bucket. When an edge crosses the line, we compute the intersection point
+ * and add it to both buckets. This gives us two clean polygons.
+ */
+function splitPolygon(
+  vertices: Array<{ x: number; y: number }>,
+  linePoint: { x: number; y: number },
+  normalX: number,
+  normalY: number,
+): [Array<{ x: number; y: number }>, Array<{ x: number; y: number }>] {
+  const left: Array<{ x: number; y: number }> = [];
+  const right: Array<{ x: number; y: number }> = [];
+
+  for (let i = 0; i < vertices.length; i++) {
+    const curr = vertices[i]!;
+    const next = vertices[(i + 1) % vertices.length]!;
+
+    // Which side of the line is this vertex on?
+    const currSide = sideOfLine(curr, linePoint, normalX, normalY);
+    const nextSide = sideOfLine(next, linePoint, normalX, normalY);
+
+    if (currSide >= 0) left.push(curr);
+    if (currSide <= 0) right.push(curr);
+
+    // If the edge crosses the line, add the intersection to both sides
+    if ((currSide > 0 && nextSide < 0) || (currSide < 0 && nextSide > 0)) {
+      const intersection = lineEdgeIntersection(curr, next, linePoint, normalX, normalY);
+      if (intersection) {
+        left.push(intersection);
+        right.push(intersection);
+      }
+    }
+  }
+
+  return [left, right];
+}
+
+/** Signed distance from point to line (positive = left side, negative = right) */
+function sideOfLine(
+  point: { x: number; y: number },
+  linePoint: { x: number; y: number },
+  nx: number,
+  ny: number,
+): number {
+  return (point.x - linePoint.x) * nx + (point.y - linePoint.y) * ny;
+}
+
+/** Find intersection of a line segment with an infinite line */
+function lineEdgeIntersection(
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+  linePoint: { x: number; y: number },
+  nx: number,
+  ny: number,
+): { x: number; y: number } | null {
+  const da = sideOfLine(a, linePoint, nx, ny);
+  const db = sideOfLine(b, linePoint, nx, ny);
+  const denom = da - db;
+  if (Math.abs(denom) < 1e-10) return null;
+  const t = da / denom;
+  return {
+    x: a.x + t * (b.x - a.x),
+    y: a.y + t * (b.y - a.y),
+  };
+}
+
+/** Compute area of a polygon using the shoelace formula */
+function polygonArea(verts: Array<{ x: number; y: number }>): number {
+  let area = 0;
+  for (let i = 0; i < verts.length; i++) {
+    const curr = verts[i]!;
+    const next = verts[(i + 1) % verts.length]!;
+    area += curr.x * next.y - next.x * curr.y;
+  }
+  return Math.abs(area) / 2;
+}
+
+/** Compute centroid of a polygon */
+function polygonCentroid(verts: Array<{ x: number; y: number }>): { x: number; y: number } {
+  let cx = 0;
+  let cy = 0;
+  for (const v of verts) {
+    cx += v.x;
+    cy += v.y;
+  }
+  return { x: cx / verts.length, y: cy / verts.length };
+}

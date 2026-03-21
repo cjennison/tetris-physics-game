@@ -106,6 +106,24 @@
       "ropeDamping": 0.01,
       "weight": 7,
       "_feel": "Heavy and rough — minimal swing, doesn't slide, solid foundation piece"
+    },
+    "glass": {
+      "label": "Glass",
+      "color": "0x88CCEE",
+      "outlineColor": "0xAAEEFF",
+      "density": 0.002,
+      "restitution": 0.1,
+      "friction": 0.3,
+      "frictionStatic": 0.4,
+      "ropeStiffness": 0.85,
+      "ropeDamping": 0.004,
+      "weight": 4,
+      "special": "glass",
+      "shatterThreshold": 1.5,
+      "fractureCuts": 3,
+      "scatterForce": 2.0,
+      "minShardArea": 150,
+      "_feel": "Medium weight, translucent blue — SHATTERS on impact into random fragments that scatter based on collision angle. Fragile and unpredictable."
     }
   },
 
@@ -115,6 +133,7 @@
     "steel": 5,
     "lead": 1,
     "rubber": 2,
-    "concrete": 2
+    "concrete": 2,
+    "glass": 2
   }
 }

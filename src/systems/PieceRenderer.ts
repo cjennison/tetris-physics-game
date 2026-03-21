@@ -71,6 +71,16 @@ export class PieceRenderer {
         ? parseInt(data.material.outlineColor, 16)
         : 0xcccccc;
 
+      /**
+       * LEARN: Glass gets lower fill opacity so it looks translucent.
+       * The "special" field in MaterialDefinition drives visual treatments
+       * beyond just color. Future materials could have other visual effects
+       * (e.g., glowing, pulsing, textured).
+       */
+      const isGlass = data?.material?.special === 'glass';
+      const fillAlpha = isGlass ? 0.45 : 0.9;
+      const outlineAlpha = isGlass ? 0.7 : 0.5;
+
       // Determine which parts to draw
       const parts = body.parts.length > 1 ? body.parts.slice(1) : body.parts;
 
@@ -79,7 +89,7 @@ export class PieceRenderer {
         if (!verts || verts.length < 3) continue;
 
         // Fill with material color
-        this.graphics.fillStyle(fillColor, 0.9);
+        this.graphics.fillStyle(fillColor, fillAlpha);
         this.graphics.beginPath();
         this.graphics.moveTo(verts[0]!.x, verts[0]!.y);
         for (let i = 1; i < verts.length; i++) {
@@ -89,7 +99,7 @@ export class PieceRenderer {
         this.graphics.fillPath();
 
         // Outline in material's outline color
-        this.graphics.lineStyle(1.5, outlineColor, 0.5);
+        this.graphics.lineStyle(isGlass ? 1 : 1.5, outlineColor, outlineAlpha);
         this.graphics.beginPath();
         this.graphics.moveTo(verts[0]!.x, verts[0]!.y);
         for (let i = 1; i < verts.length; i++) {

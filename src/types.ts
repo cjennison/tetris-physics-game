@@ -76,6 +76,8 @@ export interface MaterialDefinition {
   ropeDamping: number;
   /** Display weight (1-10 scale, for UI) */
   weight: number;
+  /** Optional: marks this as a special material with custom behavior (e.g., "glass") */
+  special?: string;
 }
 
 /** Collision categories — bit flags for Matter.js filtering */

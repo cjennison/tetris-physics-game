@@ -26,6 +26,8 @@ import { EventBus } from './EventBus';
 import { CraneSystem } from '../systems/CraneSystem';
 import { InputSystem } from '../systems/InputSystem';
 import { PieceRenderer } from '../systems/PieceRenderer';
+import { SpecialMaterialSystem } from '../systems/SpecialMaterialSystem';
+import { glassCollisionHandler } from '../systems/handlers/GlassHandler';
 import { PieceFactory, type SpawnedPiece } from '../pieces/PieceFactory';
 import { TUNING } from '../tuning';
 import {
@@ -43,6 +45,7 @@ export class GameInstance extends Phaser.Scene {
   private inputSystem!: InputSystem;
   private pieceRenderer!: PieceRenderer;
   private pieceFactory!: PieceFactory;
+  private specialMaterials!: SpecialMaterialSystem;
 
   // Active piece tracking
   private activePiece: SpawnedPiece | null = null;
@@ -90,6 +93,15 @@ export class GameInstance extends Phaser.Scene {
     this.pieceRenderer = new PieceRenderer(this);
     this.pieceFactory = new PieceFactory(this);
 
+    /**
+     * LEARN: Special materials register handlers that fire on collision.
+     * To add a new special material: 1) add it to tuning.json with a
+     * "special" field, 2) write a handler in systems/handlers/, and
+     * 3) register it here. The SpecialMaterialSystem does the rest.
+     */
+    this.specialMaterials = new SpecialMaterialSystem(this, this.pieceRenderer);
+    this.specialMaterials.registerHandler('glass', glassCollisionHandler);
+
     // Status display
     this.stateText = this.add.text(this.boardConfig.width / 2, 15, '', {
       fontSize: '12px',
@@ -109,6 +121,9 @@ export class GameInstance extends Phaser.Scene {
   }
 
   update(_time: number, _delta: number): void {
+    // Reset per-frame tracking for special materials
+    this.specialMaterials.resetFrame();
+
     // Always update rendering
     this.pieceRenderer.draw();
 
