@@ -95,6 +95,77 @@ export class MagnetTool implements CraneTool {
     return this.magnetOn;
   }
 
+  /**
+   * LEARN: The magnet draws as a horseshoe/U-shape in red and blue
+   * (the two poles). When active, it pulses with a glow effect and
+   * shows small spark particles near the poles. The pulsing uses
+   * Math.sin(time) for a smooth oscillation — a common "juice" trick.
+   */
+  drawTool(
+    graphics: Phaser.GameObjects.Graphics,
+    hookX: number,
+    hookY: number,
+    active: boolean,
+    time: number,
+  ): void {
+    const pulse = active ? 0.7 + 0.3 * Math.sin(time * 0.006) : 0.8;
+
+    // Horseshoe magnet body — U shape drawn as two vertical bars + connecting arc
+    const w = 12;   // total width of the U
+    const h = 14;   // height of the legs
+    const t = 3.5;  // thickness of the bars
+
+    // Left leg (north pole — red)
+    graphics.fillStyle(0xdd3333, pulse);
+    graphics.fillRect(hookX - w / 2, hookY - 2, t, h);
+
+    // Right leg (south pole — blue)
+    graphics.fillStyle(0x3333dd, pulse);
+    graphics.fillRect(hookX + w / 2 - t, hookY - 2, t, h);
+
+    // Connecting arc at top (gray metal)
+    graphics.lineStyle(t, 0x888888, pulse);
+    graphics.beginPath();
+    graphics.arc(hookX, hookY - 2, w / 2 - t / 2, Math.PI, 0, false);
+    graphics.strokePath();
+
+    // Pole tips — bright colored ends at the bottom of each leg
+    graphics.fillStyle(0xff5555, pulse);
+    graphics.fillRect(hookX - w / 2 - 1, hookY + h - 4, t + 2, 3);
+    graphics.fillStyle(0x5555ff, pulse);
+    graphics.fillRect(hookX + w / 2 - t - 1, hookY + h - 4, t + 2, 3);
+
+    // Active effects — electric sparks between poles
+    if (active) {
+      const sparkAlpha = 0.4 + 0.4 * Math.sin(time * 0.015);
+
+      // Spark arc between poles
+      graphics.lineStyle(1, 0xffff44, sparkAlpha);
+      const midY = hookY + h - 2;
+      const sparkOffsetX = 3 * Math.sin(time * 0.008);
+      const sparkOffsetY = 2 * Math.cos(time * 0.012);
+      graphics.lineBetween(
+        hookX - w / 2 + 1, midY,
+        hookX + sparkOffsetX, midY + sparkOffsetY - 3,
+      );
+      graphics.lineBetween(
+        hookX + sparkOffsetX, midY + sparkOffsetY - 3,
+        hookX + w / 2 - 1, midY,
+      );
+
+      // Small field dots radiating outward
+      const dotCount = 4;
+      for (let i = 0; i < dotCount; i++) {
+        const angle = (time * 0.003) + (i * Math.PI * 2 / dotCount);
+        const radius = 10 + 5 * Math.sin(time * 0.005 + i);
+        const dx = Math.cos(angle) * radius;
+        const dy = Math.sin(angle) * radius + h / 2;
+        graphics.fillStyle(0xff6666, 0.3 + 0.2 * Math.sin(time * 0.01 + i));
+        graphics.fillCircle(hookX + dx, hookY + dy, 1.5);
+      }
+    }
+  }
+
   cleanup(): void {
     this.magnetOn = false;
     this.attractedBodies = [];

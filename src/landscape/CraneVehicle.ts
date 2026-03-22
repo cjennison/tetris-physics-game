@@ -366,34 +366,31 @@ export class CraneVehicle {
     this.graphics.lineStyle(1.5, 0xcccccc, 0.6);
     this.graphics.lineBetween(tipX, tipY, this.hook.position.x, this.hook.position.y);
 
-    // Hook / tool attachment point
+    /**
+     * LEARN: Each tool draws its own visual at the hook point.
+     * This delegates rendering to the tool class — the vehicle doesn't
+     * need to know what a magnet or hook looks like. Adding a new tool
+     * (shovel, claw) just means implementing drawTool() in the new class.
+     */
     const tool = this.getActiveTool();
-    const toolActive = tool.isActive();
-    this.graphics.fillStyle(toolActive ? 0x44aa44 : tool.color);
-    this.graphics.fillCircle(this.hook.position.x, this.hook.position.y, toolActive ? 6 : 4);
+    const hookX = this.hook.position.x;
+    const hookY = this.hook.position.y;
+    tool.drawTool(this.graphics, hookX, hookY, tool.isActive(), this.scene.time.now);
 
-    // Carry line (for hook tool)
+    // Carry line (for hook tool — connects hook to grabbed piece)
     const carriedBody = tool.getCarriedBody();
     if (carriedBody) {
       this.graphics.lineStyle(1.5, 0x44aa44, 0.4);
-      this.graphics.lineBetween(
-        this.hook.position.x, this.hook.position.y,
-        carriedBody.position.x, carriedBody.position.y,
-      );
+      this.graphics.lineBetween(hookX, hookY, carriedBody.position.x, carriedBody.position.y);
     }
 
-    // Magnet field visualization
+    // Magnet field visualization — attraction radius and force lines
     if (tool instanceof MagnetTool && tool.isActive()) {
-      // Draw attraction radius
       this.graphics.lineStyle(1, 0xff4444, 0.15);
-      this.graphics.strokeCircle(this.hook.position.x, this.hook.position.y, 120);
-      // Draw lines to attracted pieces
+      this.graphics.strokeCircle(hookX, hookY, 180);
       for (const attracted of tool.getAttractedBodies()) {
         this.graphics.lineStyle(1, 0xff4444, 0.3);
-        this.graphics.lineBetween(
-          this.hook.position.x, this.hook.position.y,
-          attracted.position.x, attracted.position.y,
-        );
+        this.graphics.lineBetween(hookX, hookY, attracted.position.x, attracted.position.y);
       }
     }
   }

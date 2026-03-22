@@ -8,6 +8,11 @@
  */
 import { type SpawnedPiece } from '../../pieces/PieceFactory';
 
+/**
+ * LEARN: By giving each tool its own drawTool() method, the rendering
+ * logic lives with the tool — not in CraneVehicle. This means adding
+ * a new tool (shovel, claw, etc.) only requires implementing one class.
+ */
 export interface CraneTool {
   /** Unique name for UI display */
   readonly name: string;
@@ -49,6 +54,18 @@ export interface CraneTool {
 
   /** Whether the tool is currently "active" (magnet on, hook grabbing, etc.) */
   isActive(): boolean;
+
+  /**
+   * Draw the tool-specific visual at the hook point.
+   * Each tool renders its own shape (hook curve, horseshoe magnet, etc.)
+   */
+  drawTool(
+    graphics: Phaser.GameObjects.Graphics,
+    hookX: number,
+    hookY: number,
+    active: boolean,
+    time: number,
+  ): void;
 
   /** Clean up any physics constraints when switching away */
   cleanup(scene: Phaser.Scene): void;

@@ -81,6 +81,43 @@ export class HookTool implements CraneTool {
     return this.carriedPiece !== null;
   }
 
+  /**
+   * LEARN: The hook draws as a classic crane hook shape — a thick curved
+   * line with a pointed tip. When carrying a piece, it glows green.
+   * The shape is drawn relative to (hookX, hookY) using arc() for the curve.
+   */
+  drawTool(
+    graphics: Phaser.GameObjects.Graphics,
+    hookX: number,
+    hookY: number,
+    active: boolean,
+    _time: number,
+  ): void {
+    const color = active ? 0x44aa44 : 0xcccccc;
+
+    // Hook shank (vertical bar from rope attachment)
+    graphics.lineStyle(3, color, 0.9);
+    graphics.lineBetween(hookX, hookY - 4, hookX, hookY + 4);
+
+    // Hook curve — a C-shaped arc opening to the right
+    graphics.lineStyle(2.5, color, 0.9);
+    graphics.beginPath();
+    graphics.arc(hookX - 3, hookY + 4, 6, 0, Math.PI, false);
+    graphics.strokePath();
+
+    // Hook tip — small pointed end
+    graphics.fillStyle(color, 1);
+    graphics.fillTriangle(
+      hookX - 9, hookY + 4,
+      hookX - 10, hookY - 1,
+      hookX - 7, hookY + 2,
+    );
+
+    // Safety latch (small bar across the opening)
+    graphics.lineStyle(1.5, 0x999999, 0.6);
+    graphics.lineBetween(hookX - 1, hookY + 1, hookX + 2, hookY + 6);
+  }
+
   cleanup(scene: Phaser.Scene): void {
     this.releaseCarried(scene);
   }
