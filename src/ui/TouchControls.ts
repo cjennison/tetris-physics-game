@@ -20,6 +20,7 @@ export interface TouchState {
   ropeIn: boolean;
   ropeOut: boolean;
   grab: boolean;
+  switchTool: boolean;
 }
 
 export class TouchControls {
@@ -28,7 +29,7 @@ export class TouchControls {
     driveLeft: false, driveRight: false,
     boomUp: false, boomDown: false,
     ropeIn: false, ropeOut: false,
-    grab: false,
+    grab: false, switchTool: false,
   };
 
   private isTouchDevice: boolean;
@@ -98,6 +99,7 @@ export class TouchControls {
     rightPad.appendChild(this.createBtn('REEL ▲', 'ropeIn', '#557755', 70, 48));
     rightPad.appendChild(this.createBtn('GRAB', 'grab', '#448844', 70, 55, true));
     rightPad.appendChild(this.createBtn('REEL ▼', 'ropeOut', '#557755', 70, 48));
+    rightPad.appendChild(this.createBtn('TOOL ⟳', 'switchTool', '#885544', 70, 40, true));
 
     container.appendChild(rightPad);
 
