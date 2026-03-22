@@ -254,9 +254,13 @@ export class BulldozerVehicle implements Vehicle {
     if (left) {
       this.scene.matter.body.setAngularVelocity(this.trackWheelsRear, -speed);
       this.scene.matter.body.setAngularVelocity(this.trackWheelsFront, -speed);
+      // Apply direct force to chassis — the heavy blade adds drag that
+      // angular velocity on the track wheels alone can't overcome
+      this.scene.matter.body.applyForce(this.chassis, this.chassis.position, { x: -0.008, y: 0 });
     } else if (right) {
       this.scene.matter.body.setAngularVelocity(this.trackWheelsRear, speed);
       this.scene.matter.body.setAngularVelocity(this.trackWheelsFront, speed);
+      this.scene.matter.body.applyForce(this.chassis, this.chassis.position, { x: 0.008, y: 0 });
     }
 
     const cx = this.chassis.position.x;
@@ -556,12 +560,14 @@ export class BulldozerVehicle implements Vehicle {
       const t = i / segments;
       const localY = -halfH + t * BLADE_HEIGHT;
 
-      // Parabolic curve — deepest at center
+      // Parabolic curve — deepest at center, curving INWARD to scoop.
+      // Negative curveX makes the blade concave on the front (+X) side,
+      // so it cups forward and scoops pieces as the bulldozer pushes.
       const curveFactor = 1 - Math.pow(2 * t - 1, 2);
-      const curveX = BLADE_CURVE_DEPTH * curveFactor;
+      const curveX = -BLADE_CURVE_DEPTH * curveFactor;
 
-      outerPts.push({ x: centerX + curveX + 4, y: centerY + localY });
-      innerPts.push({ x: centerX + curveX - 2, y: centerY + localY });
+      outerPts.push({ x: centerX + curveX + 6, y: centerY + localY });
+      innerPts.push({ x: centerX + curveX, y: centerY + localY });
     }
 
     // Fill blade as closed polygon
