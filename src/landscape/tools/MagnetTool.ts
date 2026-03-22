@@ -14,8 +14,8 @@ import Phaser from 'phaser';
 import { type CraneTool } from './CraneTool';
 import { type SpawnedPiece } from '../../pieces/PieceFactory';
 
-const MAGNET_RADIUS = 120;
-const MAGNET_FORCE = 0.0004;
+const MAGNET_RADIUS = 180;
+const MAGNET_FORCE = 0.015;
 
 export class MagnetTool implements CraneTool {
   readonly name = 'Magnet';
