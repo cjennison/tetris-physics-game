@@ -27,6 +27,7 @@ import { TouchControls } from '../ui/TouchControls';
 import { type CraneTool } from './tools/CraneTool';
 import { HookTool } from './tools/HookTool';
 import { MagnetTool } from './tools/MagnetTool';
+import { ShovelTool } from './tools/ShovelTool';
 
 const VEHICLE_CATEGORY = 0x0010;
 const WHEEL_RADIUS = 13;
@@ -166,7 +167,7 @@ export class CraneVehicle {
     );
 
     // Initialize tool system
-    this.tools = [new HookTool(), new MagnetTool()];
+    this.tools = [new HookTool(), new MagnetTool(), new ShovelTool()];
 
     // Tool label HUD — fixed position on screen
     this.toolLabel = scene.add.text(10, 10, '', {

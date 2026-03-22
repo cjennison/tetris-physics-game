@@ -12,7 +12,14 @@
  */
 import Phaser from 'phaser';
 import { type CraneTool } from './CraneTool';
-import { type SpawnedPiece } from '../../pieces/PieceFactory';
+import { type SpawnedPiece, getPieceData } from '../../pieces/PieceFactory';
+
+/**
+ * LEARN: Only metals are magnetic. Rubber, concrete, and glass don't
+ * respond to magnets in real life, so we skip them. This set defines
+ * which materials the magnet ignores.
+ */
+const NON_MAGNETIC = new Set(['rubber', 'concrete', 'glass']);
 
 const MAGNET_RADIUS = 180;
 const MAGNET_FORCE = 0.015;
@@ -52,6 +59,11 @@ export class MagnetTool implements CraneTool {
       if (!body.label?.startsWith('piece-')) continue;
       if (vehicleBodies.has(body)) continue;
 
+      // Skip non-magnetic materials
+      const parent = (body as MatterJS.BodyType & { parent?: MatterJS.BodyType }).parent ?? body;
+      const pieceData = getPieceData(parent);
+      if (pieceData && NON_MAGNETIC.has(pieceData.materialKey)) continue;
+
       const dx = hookPos.x - body.position.x;
       const dy = hookPos.y - body.position.y;
       const distSq = dx * dx + dy * dy;
@@ -60,18 +72,18 @@ export class MagnetTool implements CraneTool {
       if (dist > MAGNET_RADIUS || dist < 1) continue;
 
       /**
-       * LEARN: Force = MAGNET_FORCE / distance — linear falloff.
-       * True magnetism is inverse-square, but linear feels better
-       * in a game because pieces at the edge still move noticeably.
-       * We normalize the direction vector (dx/dist, dy/dist) and
-       * scale by the force magnitude.
+       * LEARN: Force = MAGNET_FORCE * mass / distance — mass-normalized.
+       * Without mass scaling, heavy pieces (lead, density=0.008) barely
+       * budge while light pieces (aluminum, 0.0015) fly. Multiplying by
+       * mass makes F=ma give roughly equal acceleration regardless of
+       * material weight. Non-magnetic materials (rubber, concrete, glass)
+       * are skipped via the material check above.
        */
-      const forceMag = MAGNET_FORCE / Math.max(dist * 0.02, 0.5);
+      const forceMag = MAGNET_FORCE * parent.mass / Math.max(dist * 0.02, 0.5);
       const fx = (dx / dist) * forceMag;
       const fy = (dy / dist) * forceMag;
 
       // Apply force at the body's center of mass
-      const parent = (body as MatterJS.BodyType & { parent?: MatterJS.BodyType }).parent ?? body;
       scene.matter.body.applyForce(parent, parent.position, { x: fx, y: fy });
       this.attractedBodies.push(parent);
     }
