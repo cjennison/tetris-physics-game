@@ -46,7 +46,9 @@ export class TouchControls {
 
   getState(): TouchState {
     const s = { ...this.state };
+    // Reset one-shot flags after reading
     this.state.grab = false;
+    this.state.switchTool = false;
     return s;
   }
 
