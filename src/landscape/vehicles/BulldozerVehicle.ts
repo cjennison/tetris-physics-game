@@ -73,6 +73,7 @@ export class BulldozerVehicle implements Vehicle {
   private chassis: MatterJS.BodyType;
   private trackWheelsFront: MatterJS.BodyType;
   private trackWheelsRear: MatterJS.BodyType;
+  private trackWheelsMid: MatterJS.BodyType;
 
   /**
    * LEARN: The blade is a physics body that collides with pieces.
@@ -123,12 +124,26 @@ export class BulldozerVehicle implements Vehicle {
      */
     const chassisY = terrainY - TRACK_HEIGHT - DOZER_HEIGHT / 2;
 
-    // Main chassis — wide and flat
-    this.chassis = scene.matter.add.rectangle(
-      startX, chassisY, DOZER_WIDTH, DOZER_HEIGHT,
+    /**
+     * Chassis uses a chamfered shape — the front bottom edge is angled
+     * upward like a real bulldozer's belly pan. This prevents the chassis
+     * from catching on terrain features and helps it ride up over obstacles.
+     * The rear is also slightly angled for reversing over terrain.
+     */
+    const chamfer = 10; // how much the front/rear bottom corners are raised
+    const chassisVerts = [
+      { x: -DOZER_WIDTH / 2, y: -DOZER_HEIGHT / 2 },           // top-left
+      { x: DOZER_WIDTH / 2, y: -DOZER_HEIGHT / 2 },            // top-right
+      { x: DOZER_WIDTH / 2, y: DOZER_HEIGHT / 2 - chamfer },   // right, above bottom-right
+      { x: DOZER_WIDTH / 2 - chamfer, y: DOZER_HEIGHT / 2 },   // bottom-right chamfered
+      { x: -DOZER_WIDTH / 2 + chamfer, y: DOZER_HEIGHT / 2 },  // bottom-left chamfered
+      { x: -DOZER_WIDTH / 2, y: DOZER_HEIGHT / 2 - chamfer },  // left, above bottom-left
+    ];
+    this.chassis = scene.matter.add.fromVertices(
+      startX, chassisY, chassisVerts,
       {
         label: 'vehicle-chassis',
-        friction: 0.8, frictionStatic: 1.2, frictionAir: 0.04,
+        friction: 0.3, frictionStatic: 0.5, frictionAir: 0.04,
         density: 0.015,
         collisionFilter: { category: VEHICLE_CATEGORY, mask: collisionMask },
       },
@@ -159,10 +174,30 @@ export class BulldozerVehicle implements Vehicle {
       },
     );
 
+    /**
+     * Middle track wheel — a third contact point between front and rear.
+     * This helps the bulldozer conform to uneven terrain instead of
+     * bridging gaps between the front and rear wheels. Real bulldozers
+     * have 5-7 road wheels per side; three physics wheels is a good
+     * compromise between terrain handling and performance.
+     */
+    this.trackWheelsMid = scene.matter.add.circle(
+      startX, wheelY, TRACK_WHEEL_RADIUS,
+      {
+        label: 'vehicle-track-wheel',
+        friction: 2.0, frictionStatic: 3.0, density: 0.008,
+        collisionFilter: { category: VEHICLE_CATEGORY, mask: collisionMask },
+      },
+    );
+
     // Track axle constraints
     scene.matter.add.constraint(this.chassis, this.trackWheelsRear, 0, 0.6, {
       pointA: { x: -DOZER_WIDTH / 2.5, y: DOZER_HEIGHT / 2 },
       damping: 0.02, label: 'track-axle-rear',
+    });
+    scene.matter.add.constraint(this.chassis, this.trackWheelsMid, 0, 0.6, {
+      pointA: { x: 0, y: DOZER_HEIGHT / 2 },
+      damping: 0.02, label: 'track-axle-mid',
     });
     scene.matter.add.constraint(this.chassis, this.trackWheelsFront, 0, 0.6, {
       pointA: { x: DOZER_WIDTH / 2.5, y: DOZER_HEIGHT / 2 },
@@ -232,7 +267,7 @@ export class BulldozerVehicle implements Vehicle {
   }
 
   destroy(): void {
-    const bodies = [this.chassis, this.trackWheelsFront, this.trackWheelsRear, this.blade];
+    const bodies = [this.chassis, this.trackWheelsFront, this.trackWheelsMid, this.trackWheelsRear, this.blade];
     for (const body of bodies) {
       this.scene.matter.world.remove(body);
     }
@@ -253,14 +288,17 @@ export class BulldozerVehicle implements Vehicle {
 
     if (left) {
       this.scene.matter.body.setAngularVelocity(this.trackWheelsRear, -speed);
+      this.scene.matter.body.setAngularVelocity(this.trackWheelsMid, -speed);
       this.scene.matter.body.setAngularVelocity(this.trackWheelsFront, -speed);
-      // Apply direct force to chassis — the heavy blade adds drag that
-      // angular velocity on the track wheels alone can't overcome
-      this.scene.matter.body.applyForce(this.chassis, this.chassis.position, { x: -0.008, y: 0 });
+      // Apply direct force to chassis — increased from 0.008 to 0.014
+      // to overcome terrain resistance. The bulldozer is heavy and the
+      // blade creates drag; it needs substantial force to climb hills.
+      this.scene.matter.body.applyForce(this.chassis, this.chassis.position, { x: -0.014, y: 0 });
     } else if (right) {
       this.scene.matter.body.setAngularVelocity(this.trackWheelsRear, speed);
+      this.scene.matter.body.setAngularVelocity(this.trackWheelsMid, speed);
       this.scene.matter.body.setAngularVelocity(this.trackWheelsFront, speed);
-      this.scene.matter.body.applyForce(this.chassis, this.chassis.position, { x: 0.008, y: 0 });
+      this.scene.matter.body.applyForce(this.chassis, this.chassis.position, { x: 0.014, y: 0 });
     }
 
     const cx = this.chassis.position.x;
@@ -479,9 +517,11 @@ export class BulldozerVehicle implements Vehicle {
     // Track wheel hubs (at physics positions)
     this.graphics.fillStyle(0x555555);
     this.graphics.fillCircle(this.trackWheelsRear.position.x, this.trackWheelsRear.position.y, TRACK_WHEEL_RADIUS - 2);
+    this.graphics.fillCircle(this.trackWheelsMid.position.x, this.trackWheelsMid.position.y, TRACK_WHEEL_RADIUS - 2);
     this.graphics.fillCircle(this.trackWheelsFront.position.x, this.trackWheelsFront.position.y, TRACK_WHEEL_RADIUS - 2);
     this.graphics.fillStyle(0x666666);
     this.graphics.fillCircle(this.trackWheelsRear.position.x, this.trackWheelsRear.position.y, 3);
+    this.graphics.fillCircle(this.trackWheelsMid.position.x, this.trackWheelsMid.position.y, 3);
     this.graphics.fillCircle(this.trackWheelsFront.position.x, this.trackWheelsFront.position.y, 3);
   }
 
