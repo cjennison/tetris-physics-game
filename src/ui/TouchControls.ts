@@ -52,6 +52,16 @@ export class TouchControls {
     return s;
   }
 
+  /**
+   * LEARN: peekState reads the current state WITHOUT consuming one-shot
+   * flags. The VehicleManager uses this to check for vehicle swap input
+   * before the vehicle's update() consumes the state. If a swap is
+   * detected, the manager handles it and the old vehicle never sees it.
+   */
+  peekState(): TouchState {
+    return { ...this.state };
+  }
+
   private createDOM(): HTMLDivElement {
     const container = document.createElement('div');
     container.id = 'touch-controls';
@@ -101,7 +111,7 @@ export class TouchControls {
     rightPad.appendChild(this.createBtn('REEL ▲', 'ropeIn', '#557755', 70, 48));
     rightPad.appendChild(this.createBtn('GRAB', 'grab', '#448844', 70, 55, true));
     rightPad.appendChild(this.createBtn('REEL ▼', 'ropeOut', '#557755', 70, 48));
-    rightPad.appendChild(this.createBtn('TOOL ⟳', 'switchTool', '#885544', 70, 40, true));
+    rightPad.appendChild(this.createBtn('VEH ⟳', 'switchTool', '#885544', 70, 40, true));
 
     container.appendChild(rightPad);
 

@@ -11,8 +11,9 @@ import Phaser from 'phaser';
 import { PieceRenderer } from '../systems/PieceRenderer';
 import { ProcessingColumn, type ColumnConfig } from './ProcessingColumn';
 import { Hopper, type HopperConfig } from '../landscape/Hopper';
-import { CraneVehicle } from '../landscape/CraneVehicle';
+import { VehicleManager } from '../landscape/vehicles/VehicleManager';
 import { Terrain, COLUMN_GAP_LEFT, COLUMN_GAP_RIGHT, COLUMN_GROUND_Y } from '../landscape/Terrain';
+import { TouchControls } from '../ui/TouchControls';
 import {
   LANDSCAPE_WIDTH,
   LANDSCAPE_HEIGHT,
@@ -23,7 +24,7 @@ import {
 export class LandscapeScene extends Phaser.Scene {
   private pieceRenderer!: PieceRenderer;
   private hopper!: Hopper;
-  private vehicle!: CraneVehicle;
+  private vehicleManager!: VehicleManager;
   private columns: ProcessingColumn[] = [];
 
   constructor() {
@@ -67,11 +68,17 @@ export class LandscapeScene extends Phaser.Scene {
     col1.create();
     this.columns.push(col1);
 
-    // Crane vehicle (starts in the lower-left pile area)
-    this.vehicle = new CraneVehicle(this, this.pieceRenderer, 300);
+    /**
+     * LEARN: The VehicleManager handles spawning and swapping between
+     * vehicle types (hook crane, magnet ball crane, bulldozer). Each
+     * vehicle type is a completely different class with its own physics
+     * bodies and rendering. TAB or the vehicle button swaps between them.
+     */
+    const touchControls = new TouchControls();
+    this.vehicleManager = new VehicleManager(this, 300, touchControls);
 
     for (const col of this.columns) {
-      this.vehicle.addColumnZone(
+      this.vehicleManager.addColumnZone(
         col.config.originX,
         col.config.originX + col.config.width,
         (piece) => col.receivePiece(piece),
@@ -83,7 +90,7 @@ export class LandscapeScene extends Phaser.Scene {
 
     // HUD (fixed to camera)
     const instructions = this.add.text(0, 0,
-      '← → drive  |  ↑↓ boom  |  SHIFT+↑↓ rope  |  SPACE grab/drop  |  scroll zoom  |  middle-drag pan', {
+      '← → drive  |  ↑↓ boom/blade  |  SHIFT+↑↓ rope  |  SPACE action  |  TAB swap vehicle  |  scroll zoom', {
         fontSize: '10px', color: '#445566', fontFamily: 'monospace',
         backgroundColor: '#0d0d1a99',
         padding: { x: 6, y: 3 },
@@ -98,7 +105,7 @@ export class LandscapeScene extends Phaser.Scene {
   update(time: number, delta: number): void {
     this.pieceRenderer.draw();
     this.hopper.update();
-    this.vehicle.update();
+    this.vehicleManager.update();
     for (const col of this.columns) {
       col.update(time, delta);
     }
@@ -111,7 +118,7 @@ export class LandscapeScene extends Phaser.Scene {
    */
   private followVehicle(): void {
     const cam = this.cameras.main;
-    const pos = this.vehicle.getPosition();
+    const pos = this.vehicleManager.getPosition();
 
     // The "dead zone" — middle 30% of the viewport (in world coords)
     const viewW = cam.width / cam.zoom;
